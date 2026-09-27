@@ -1,0 +1,19 @@
+{
+  "name": "@laudo/rule-engine",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@laudo/contracts": "0.1.0",
+    "expr-eval": "^2.0.2"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String?
+  phone     String?
+  status    String   @default("ACTIVE")
+  users     User[]
+  patients  Patient[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id                       String                 @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId           String                 @db.ObjectId
+  organization             Organization           @relation(fields: [organizationId], references: [id])
+  name                     String
+  email                    String                 @unique
+  passwordHash             String
+  refreshTokenHash         String?
+  refreshTokenExpiresAt    DateTime?
+  role                     String                 @default("PSYCHOLOGIST")
+  professionalRegistration String?
+  document                 String?
+  phone                    String?
+  specialties              Json?
+  professionalBio          String?
+  signatureText            String?
+  status                   String                 @default("ACTIVE")
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  evaluations              Evaluation[]
+  auditEvents              AuditEvent[]
+  passwordResetTokens      PasswordResetToken[]
+  deletionRequests         DeletionRequest[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, expiresAt])
+}
+
+model DeletionRequest {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId   String   @db.ObjectId
+  requestedById    String   @db.ObjectId
+  targetType       String
+  targetId         String   @db.ObjectId
+  status           String   @default("PENDING")
+  reason           String?
+  eligibleAt       DateTime?
+  processedAt      DateTime?
+  processingResult String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  requestedBy      User     @relation(fields: [requestedById], references: [id])
+
+  @@index([organizationId, status, createdAt])
+  @@index([requestedById, status])
+}
+
+model Patient {
+  id                 String       @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId     String       @db.ObjectId
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  name               String
+  document           String?
+  birthDate          DateTime?
+  gender             String?
+  email              String?
+  phone              String?
+  education          String?
+  healthPlan         String?
+  responsible1Name   String?
+  responsible1Phone  String?
+  responsible2Name   String?
+  responsible2Phone  String?
+  address            Json?
+  notes              String?
+  metadata           Json?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+  evaluations        Evaluation[]
+
+  @@index([organizationId, name])
+}
+
+model Evaluation {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String       @db.ObjectId
+  patientId      String       @db.ObjectId
+  professionalId String       @db.ObjectId
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  professional   User         @relation(fields: [professionalId], references: [id])
+  title          String
+  status         String       @default("DRAFT")
+  requester      String?
+  purpose        String?
+  demandDescription String?
+  anamnesis      Json?
+  conclusion     String?
+  referral       String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+  completedAt    DateTime?
+  applications   InstrumentApplication[]
+  reports        GeneratedReport[]
+
+  @@index([organizationId, status])
+}
+
+model InstrumentDefinition {
+  id          String             @id @default(auto()) @map("_id") @db.ObjectId
+  code        String             @unique
+  name        String
+  description String?
+  category    String?
+  status      String             @default("ACTIVE")
+  versions    InstrumentVersion[]
+}
+
+model InstrumentVersion {
+  id                  String                 @id @default(auto()) @map("_id") @db.ObjectId
+  instrumentId        String                 @db.ObjectId
+  instrument          InstrumentDefinition   @relation(fields: [instrumentId], references: [id])
+  version             String
+  status              String                 @default("DRAFT")
+  sourceMetadata      Json?
+  licenseMetadata     Json?
+  formSchema          Json
+  rules               Json
+  outputSchema        Json
+  presentationSchema  Json?
+  contentHash         String?
+  createdAt           DateTime               @default(now())
+  publishedAt         DateTime?
+  applications        InstrumentApplication[]
+
+  @@unique([instrumentId, version])
+}
+
+model InstrumentApplication {
+  id                  String            @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId      String            @db.ObjectId
+  evaluationId        String            @db.ObjectId
+  instrumentVersionId String            @db.ObjectId
+  status              String            @default("NOT_STARTED")
+  answers             Json?
+  result              Json?
+  ruleTrace           Json?
+  professionalSummary String?
+  startedAt           DateTime?
+  calculatedAt        DateTime?
+  reviewedAt          DateTime?
+  lockedAt            DateTime?
+  evaluation          Evaluation        @relation(fields: [evaluationId], references: [id])
+  instrumentVersion   InstrumentVersion @relation(fields: [instrumentVersionId], references: [id])
+}
+
+model GeneratedReport {
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String     @db.ObjectId
+  evaluationId   String     @db.ObjectId
+  revision       Int
+  snapshot       Json
+  storageKey     String
+  hash           String
+  generatedBy    String
+  generatedAt    DateTime   @default(now())
+  evaluation     Evaluation @relation(fields: [evaluationId], references: [id])
+
+  @@unique([evaluationId, revision])
+}
+
+model AuditEvent {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  userId         String?  @db.ObjectId
+  event          String
+  entityType     String
+  entityId       String   @db.ObjectId
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, entityType, entityId])
+}

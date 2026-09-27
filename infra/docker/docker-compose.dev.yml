@@ -1,0 +1,47 @@
+services:
+  api-dev:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.dev
+    container_name: laudo-api-dev
+    command: npm run dev:api:local
+    working_dir: /app
+    environment:
+      DATABASE_URL: mongodb://mongodb:27017/laudo?replicaSet=rs0
+      API_PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-development-only-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-development-only-refresh-secret}
+      WEB_ORIGIN: http://localhost:5173
+      SEED_DEMO_INSTRUMENT: ${SEED_DEMO_INSTRUMENT:-true}
+      TSC_WATCHFILE: FixedPollingInterval
+      TSC_WATCHDIRECTORY: DynamicPriorityPolling
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../..:/app
+      - laudo-api-dev-node-modules:/app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+
+  web-dev:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.dev
+    container_name: laudo-web-dev
+    command: npm run dev:web:local
+    working_dir: /app
+    environment:
+      VITE_DEV_PROXY_TARGET: http://api-dev:3000
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../..:/app
+      - laudo-web-dev-node-modules:/app/node_modules
+
+volumes:
+  laudo-api-dev-node-modules:
+  laudo-web-dev-node-modules:

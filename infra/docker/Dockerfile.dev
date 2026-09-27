@@ -1,0 +1,11 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/rule-engine/package.json packages/rule-engine/package.json
+RUN npm ci
