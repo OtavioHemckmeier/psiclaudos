@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
@@ -10,7 +10,19 @@ import type { InstrumentRule } from '@laudo/contracts';
 
 @Injectable()
 export class CatalogService {
+  private readonly logger = new Logger(CatalogService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  private async updateSeedVersion(existing: { id: string; contentHash: string | null }, code: string, data: Prisma.InstrumentVersionUpdateInput) {
+    const applications = await this.prisma.instrumentApplication.count({ where: { instrumentVersionId: existing.id } });
+    if (applications > 0) {
+      if (existing.contentHash !== data.contentHash)
+        this.logger.warn(`A versão publicada de ${code} possui aplicações e não foi alterada. Publique uma nova versão para atualizar suas regras.`);
+      return;
+    }
+    await this.prisma.instrumentVersion.update({ where: { id: existing.id }, data });
+  }
 
   listPublished(category?: string) {
     return this.prisma.instrumentDefinition.findMany({ where: { status: 'ACTIVE', ...(category ? { category } : {}), versions: { some: { status: 'PUBLISHED' } } }, include: { versions: { where: { status: 'PUBLISHED' }, orderBy: { publishedAt: 'desc' }, take: 1 } }, orderBy: { name: 'asc' } });
@@ -61,7 +73,7 @@ export class CatalogService {
     };
     const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: scaredCInstrument.version } });
     if (existing) {
-      await this.prisma.instrumentVersion.update({ where: { id: existing.id }, data: versionData });
+      await this.updateSeedVersion(existing, scaredCInstrument.code, versionData);
       return;
     }
     await this.prisma.instrumentVersion.create({ data: {
@@ -101,7 +113,7 @@ export class CatalogService {
     };
     const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: scaredPInstrument.version } });
     if (existing) {
-      await this.prisma.instrumentVersion.update({ where: { id: existing.id }, data: versionData });
+      await this.updateSeedVersion(existing, scaredPInstrument.code, versionData);
       return;
     }
     await this.prisma.instrumentVersion.create({ data: {
@@ -122,15 +134,12 @@ export class CatalogService {
     const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: snapIvInstrument.version } });
     const contentHash = createHash('sha256').update(JSON.stringify(snapIvInstrument)).digest('hex');
     if (existing) {
-      await this.prisma.instrumentVersion.update({
-        where: { id: existing.id },
-        data: {
+      await this.updateSeedVersion(existing, snapIvInstrument.code, {
           formSchema: snapIvInstrument.formSchema as unknown as Prisma.InputJsonValue,
           rules: snapIvInstrument.rules as unknown as Prisma.InputJsonValue,
           outputSchema: snapIvInstrument.outputSchema as unknown as Prisma.InputJsonValue,
           presentationSchema: snapIvInstrument.presentationSchema as Prisma.InputJsonValue,
           contentHash,
-        },
       });
       return;
     }
@@ -205,7 +214,7 @@ export class CatalogService {
       publishedAt: new Date(),
     };
     if (existingVersion) {
-      await this.prisma.instrumentVersion.update({ where: { id: existingVersion.id }, data: versionData });
+      await this.updateSeedVersion(existingVersion, asrs18Instrument.code, versionData);
       return;
     }
     await this.prisma.instrumentVersion.create({

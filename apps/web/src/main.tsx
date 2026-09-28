@@ -8,8 +8,10 @@ import {
 } from "react-router-dom";
 import "./styles.css";
 import { SnapIvCard, SnapIvPage } from "./snap-iv";
+import { SnapIvResults } from "./snap-iv-results";
 import { ScaredCCard, ScaredCPage } from "./scared-c";
 import { ScaredPCard, ScaredPPage, ScaredPResults } from "./scared-p";
+import { InstrumentFieldControl, type InstrumentField } from "./instrument-field";
 
 const API = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -180,13 +182,6 @@ type Evaluation = {
   referral?: string | null;
   patient: Patient;
 };
-type Field = {
-  id: string;
-  label: string;
-  type: string;
-  required: boolean;
-  options?: Array<{ value: string; label: string }>;
-};
 type Instrument = {
   id: string;
   code: string;
@@ -200,7 +195,7 @@ type Instrument = {
       platform?: PlatformInstrumentMetadata;
     } | null;
     formSchema: {
-      sections: Array<{ id: string; title: string; fields: Field[] }>;
+      sections: Array<{ id: string; title: string; fields: InstrumentField[] }>;
     };
   }>;
 };
@@ -422,337 +417,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         "Não foi possível concluir a operação.",
     );
   return response.json();
-}
-
-function InstrumentFieldControl({
-  field,
-  value,
-  disabled,
-  onChange,
-}: {
-  field: Field;
-  value: unknown;
-  disabled: boolean;
-  onChange: (value: unknown) => void;
-}) {
-  const [newRespondent, setNewRespondent] = useState("");
-  const [customRespondents, setCustomRespondents] = useState<string[]>([]);
-  if (field.type === "TEXTAREA") {
-    return (
-      <textarea
-        disabled={disabled}
-        rows={5}
-        value={String(value ?? "")}
-        onChange={(event) => onChange(event.target.value)}
-        required={field.required}
-      />
-    );
-  }
-  if (field.type === "BOOLEAN") {
-    return (
-      <label className="boolean-field">
-        <input
-          disabled={disabled}
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(event) => onChange(event.target.checked)}
-        />{" "}
-        Sim
-      </label>
-    );
-  }
-  if (field.type === "MULTIPLE_CHOICE") {
-    const selected = Array.isArray(value) ? value.map(String) : [];
-    return (
-      <fieldset className="choice-list">
-        {field.options?.map((option) => (
-          <label key={option.value}>
-            <input
-              disabled={disabled}
-              type="checkbox"
-              checked={selected.includes(option.value)}
-              onChange={(event) =>
-                onChange(
-                  event.target.checked
-                    ? [...selected, option.value]
-                    : selected.filter((item) => item !== option.value),
-                )
-              }
-            />{" "}
-            {option.label}
-          </label>
-        ))}
-      </fieldset>
-    );
-  }
-  if (
-    field.type === "SINGLE_CHOICE" ||
-    (field.type === "SCALE" && field.options?.length)
-  ) {
-    if (field.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(field.id) || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id)) {
-      const isSnapIv = field.id.startsWith("snap_iv_");
-      return (
-        <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id) ? "scared-choice-list" : isSnapIv ? "snapiv-choice-list" : "asrs-choice-list"}>
-          {field.options?.map((option) => (
-            <label key={option.value} title={option.label}>
-              <input
-                disabled={disabled}
-                type="radio"
-                name={field.id}
-                aria-label={option.label}
-                checked={value === option.value}
-                onChange={() => onChange(option.value)}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
-      );
-    }
-    if (field.id.endsWith("_respondent")) {
-      const selectedValue = String(value ?? "");
-      const options = [...(field.options ?? [])];
-      for (const respondent of [...customRespondents, selectedValue]) {
-        if (respondent && !options.some((option) => option.value === respondent)) {
-          options.push({ value: respondent, label: respondent });
-        }
-      }
-      const addRespondent = () => {
-        const respondent = newRespondent.trim();
-        if (!respondent) return;
-        setCustomRespondents((current) => [...new Set([...current, respondent])]);
-        onChange(respondent);
-        setNewRespondent("");
-      };
-      return (
-        <div className="snapiv-respondent-control">
-          <select
-            disabled={disabled}
-            value={selectedValue}
-            onChange={(event) => onChange(event.target.value)}
-            required={field.required}
-          >
-            <option value="">Selecione</option>
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <div className="snapiv-add-respondent">
-            <input
-              aria-label="Novo Respondente"
-              disabled={disabled}
-              placeholder="Novo Respondente"
-              value={newRespondent}
-              onChange={(event) => setNewRespondent(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  addRespondent();
-                }
-              }}
-            />
-            <button type="button" disabled={disabled || !newRespondent.trim()} onClick={addRespondent}>
-              + Adicionar
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <select
-        disabled={disabled}
-        value={String(value ?? "")}
-        onChange={(event) => onChange(event.target.value)}
-        required={field.required}
-      >
-        <option value="">Selecione</option>
-        {field.options?.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    );
-  }
-  const inputType =
-    field.type === "NUMBER" || field.type === "SCALE"
-      ? "number"
-      : field.type === "DATE"
-        ? "date"
-        : "text";
-  return (
-    <input
-      disabled={disabled}
-      type={inputType}
-      value={String(value ?? "")}
-      onChange={(event) => onChange(event.target.value)}
-      required={field.required}
-    />
-  );
-}
-
-const snapIvResultDomains = [
-  { key: "inattention", label: "Desatenção", description: "Avalia dificuldades de concentração e organização." },
-  { key: "hyperactivity_impulsivity", label: "Hiperatividade/Impulsividade", description: "Avalia agitação, inquietude e atitudes impulsivas." },
-  { key: "opposition_defiance", label: "Oposição/Desafio", description: "Avalia comportamentos desafiadores e de oposição a regras." },
-];
-
-function snapIvClassification(score: number, opposition: boolean) {
-  const firstCutoff = opposition ? 8 : 13;
-  const secondCutoff = opposition ? 14 : 18;
-  const thirdCutoff = opposition ? 19 : 23;
-  if (score < firstCutoff) return "Sintomas Não Significativos";
-  if (score < secondCutoff) return "Sintomas Leves";
-  if (score < thirdCutoff) return "Sintomas Moderados";
-  return "Sintomas Graves";
-}
-
-function SnapIvResults({
-  result,
-  answers,
-  summary,
-  disabled,
-  onSummaryChange,
-  onSave,
-}: {
-  result: Record<string, unknown>;
-  answers: Record<string, unknown>;
-  summary: string;
-  disabled: boolean;
-  onSummaryChange: (value: string) => void;
-  onSave: () => void;
-}) {
-  const [view, setView] = useState<"table" | "chart">("table");
-  const [selectedForm, setSelectedForm] = useState(1);
-  const forms = [...new Set(Object.keys(result)
-    .map((fieldId) => fieldId.match(/^snap_iv_form_(\d+)_(?:inattention|hyperactivity_impulsivity|opposition_defiance)_score$/)?.[1])
-    .filter((formNumber): formNumber is string => Boolean(formNumber))
-    .map(Number))].sort((first, second) => first - second);
-  if (forms.length === 0) forms.push(1);
-  const formNumber = forms.includes(selectedForm) ? selectedForm : forms[0];
-  const prefix = `snap_iv_form_${formNumber}`;
-  const respondentLabels: Record<string, string> = {
-    self: "Autorelato",
-    mother: "Mãe",
-    father: "Pai",
-    teacher: "Professor",
-  };
-  const respondentValue = String(answers[`${prefix}_respondent`] ?? "");
-  const respondent = (respondentLabels[respondentValue] ?? respondentValue) || `Formulário ${formNumber}`;
-  const rows = snapIvResultDomains.map((domain) => {
-    const scoreValue = result[`${prefix}_${domain.key}_score`] ?? (formNumber === 1 ? result[`${domain.key}_score`] : undefined);
-    const numericScore = Number(scoreValue);
-    const classification = result[`${prefix}_${domain.key}_classification`] ?? (formNumber === 1 ? result[`${domain.key}_classification`] : undefined);
-    const classificationLabel = typeof classification === "string" && classification.trim()
-      ? classification
-      : scoreValue !== undefined && Number.isFinite(numericScore)
-        ? snapIvClassification(numericScore, domain.key === "opposition_defiance")
-        : "Sem classificação";
-    const normalizedClassification = classificationLabel.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const classificationLevel = normalizedClassification.includes("nao significativo") ? "none"
-      : normalizedClassification.includes("leve") ? "mild"
-        : normalizedClassification.includes("moderado") ? "moderate"
-          : normalizedClassification.includes("grave") ? "severe" : "unknown";
-    return {
-      ...domain,
-      score: scoreValue === undefined || !Number.isFinite(numericScore) ? null : numericScore,
-      classificationLabel,
-      classificationLevel,
-    };
-  });
-
-  return (
-    <div className="snapiv-results">
-      {forms.length > 1 && (
-        <div className="tab-list snapiv-results-tabs" role="tablist" aria-label="Resultados por formulário">
-          {forms.map((number) => (
-            <button
-              key={number}
-              type="button"
-              role="tab"
-              aria-selected={formNumber === number}
-              className={formNumber === number ? "active" : ""}
-              onClick={() => setSelectedForm(number)}
-            >
-              Formulário {number}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="asrs-result-view-toggle" role="group" aria-label="Visualização dos resultados">
-        <button className={view === "table" ? "active" : ""} type="button" onClick={() => setView("table")}>☷ Tabela</button>
-        <button className={view === "chart" ? "active" : ""} type="button" onClick={() => setView("chart")}>▦ Gráfico</button>
-      </div>
-      {view === "table" ? (
-        <div className="snapiv-results-table result-table-wrap">
-          <table className="result-table">
-            <thead><tr><th>Itens</th><th>Pontuação</th><th>Classificação</th></tr></thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.key}>
-                  <td>{row.label}</td>
-                  <td>{row.score ?? "—"}</td>
-                  <td>{row.classificationLabel}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="snapiv-results-chart" role="img" aria-label={`Gráfico das pontuações do SNAP-IV para ${respondent}`}>
-          <h3>SNAP-IV ({respondent})</h3>
-          <div className="snapiv-chart-legend" aria-hidden="true">
-            <span><i className="snapiv-chart-key none" /> Sintomas Não Significativos</span>
-            <span><i className="snapiv-chart-key mild" /> Sintomas Leves</span>
-            <span><i className="snapiv-chart-key moderate" /> Sintomas Moderados</span>
-            <span><i className="snapiv-chart-key severe" /> Sintomas Graves</span>
-          </div>
-          <div className="snapiv-chart-body">
-            <div className="snapiv-chart-axis" aria-hidden="true">
-              {Array.from({ length: 28 }, (_, index) => 27 - index).map((tick) => <span key={tick}>{tick}</span>)}
-            </div>
-            <div className="snapiv-chart-bars">
-              {rows.map((row) => (
-                <div className="snapiv-chart-column" key={row.key}>
-                  <div className="snapiv-chart-bar-area">
-                    {row.score !== null && (
-                      <div
-                        className={`snapiv-chart-bar ${row.classificationLevel}`}
-                        style={{ height: `${Math.max(0, Math.min(row.score, 27)) / 27 * 100}%` }}
-                      >
-                        <strong>{row.score}</strong>
-                      </div>
-                    )}
-                  </div>
-                  <strong>{row.label}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      <p className="snapiv-results-caption">
-        {snapIvResultDomains.map((domain) => <span key={domain.key}><strong>{domain.label}:</strong> {domain.description}</span>)}
-      </p>
-      <p className="snapiv-results-source">
-        Classificação por faixas sugeridas no <a href="https://capp.ucsf.edu/sites/g/files/tkssra5836/f/SNAP-IV-26-item-Teacher-and-Parent-rating-scale.pdf" target="_blank" rel="noreferrer">guia de pontuação SNAP-IV 26 itens</a>.
-      </p>
-      <div className="snapiv-results-interpretation">
-        <label htmlFor="snapiv-result-summary">Interpretação dos Resultados</label>
-        <textarea
-          id="snapiv-result-summary"
-          disabled={disabled}
-          value={summary}
-          onChange={(event) => onSummaryChange(event.target.value)}
-          placeholder="Apresente a interpretação dos resultados da avaliação, articulando os dados obtidos e as observações clínicas."
-          rows={10}
-        />
-        <button type="button" disabled={disabled} onClick={onSave}>Salvar</button>
-      </div>
-    </div>
-  );
 }
 
 function Login({ onLogin }: { onLogin: () => void }) {
@@ -1051,6 +715,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     referral: "",
   });
   const [application, setApplication] = useState<Application | null>(null);
+  const [activeEditorApplicationId, setActiveEditorApplicationId] = useState<string | null>(null);
   const [applicationTab, setApplicationTab] = useState<
     "test" | "results" | "details"
   >("test");
@@ -1203,8 +868,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   }, [reportRouteId, selectedEvaluation?.id]);
   useEffect(() => {
     if (!resultRouteId || application?.id === resultRouteId) return;
-    void openApplication(resultRouteId, false);
-  }, [resultRouteId, application?.id]);
+    void openApplication(resultRouteId);
+  }, [resultRouteId]);
   async function createFullPatient(event: FormEvent) {
     event.preventDefault();
     setPatientFormError("");
@@ -1530,7 +1195,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       (item) => item.id === selectedInstrumentVersionId,
     );
     if (!instrument || !version) return;
-    setSelectedEvaluation(evaluation);
+    setSelectedEvaluation(await request<Evaluation>(`/evaluations/${evaluation.id}`));
     setApplication({
       ...created,
       instrumentVersion: created.instrumentVersion?.formSchema
@@ -1550,14 +1215,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     await loadReports(evaluation.id);
     setInstrumentPickerOpen(false);
     setInstrumentVersionId("");
-    routerNavigate(`/resultados/${created.id}`);
+    setActiveEditorApplicationId(created.id);
   }
   const openInstrumentPicker = (evaluation: Evaluation) => {
     setSelectedEvaluation(evaluation);
     setInstrumentVersionId("");
     setInstrumentPickerOpen(true);
   };
-  async function openApplication(applicationId: string, navigateToResult = true) {
+  async function openApplication(applicationId: string) {
     try {
       const loaded = await request<Application>(
         `/evaluations/applications/${applicationId}`,
@@ -1577,7 +1242,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         setSelectedEvaluation(evaluation);
         await loadReports(evaluation.id);
       }
-      if (navigateToResult) routerNavigate(`/resultados/${applicationId}`);
+      setActiveEditorApplicationId(applicationId);
     } catch (err) {
       setMessage(
         err instanceof Error
@@ -1590,6 +1255,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     try {
       const evaluation = await request<Evaluation>(`/evaluations/${id}`);
       setSelectedEvaluation(evaluation);
+      setActiveEditorApplicationId(null);
       setReportChapter("identification");
       setReportContent({
         requester: evaluation.requester ?? "",
@@ -1845,6 +1511,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     };
     setMobileMenu(false);
     routerNavigate(routes[nextView]);
+  };
+  const selectReportChapter = (chapter: typeof reportChapter) => {
+    setActiveEditorApplicationId(null);
+    setReportChapter(chapter);
+    if (view === "results" && selectedEvaluation) {
+      void openReport(selectedEvaluation.id).then(() => setReportChapter(chapter));
+    }
   };
   const snapIvAvailableFormCount = Math.max(
     1,
@@ -2408,7 +2081,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <button onClick={() => navigate("platformTests")}>Ver testes da plataforma</button>
           </section>
         )}
-        {view === "editor" && selectedEvaluation && (
+        {(view === "editor" || view === "results") && selectedEvaluation && (
           <>
             <button className="back-link report-editor-back" onClick={() => navigate("reports")}>
               ← Voltar para laudos
@@ -2417,32 +2090,32 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <aside className="report-outline">
               <span className="section-kicker">Capítulos</span>
               <button
-                className={reportChapter === "identification" ? "active" : ""}
-                onClick={() => setReportChapter("identification")}
+                className={!activeEditorApplicationId && view !== "results" && reportChapter === "identification" ? "active" : ""}
+                onClick={() => selectReportChapter("identification")}
               >
                 Identificação
               </button>
               <button
-                className={reportChapter === "demand" ? "active" : ""}
-                onClick={() => setReportChapter("demand")}
+                className={!activeEditorApplicationId && view !== "results" && reportChapter === "demand" ? "active" : ""}
+                onClick={() => selectReportChapter("demand")}
               >
                 Descrição da demanda
               </button>
               <button
-                className={reportChapter === "anamnesis" ? "active" : ""}
-                onClick={() => setReportChapter("anamnesis")}
+                className={!activeEditorApplicationId && view !== "results" && reportChapter === "anamnesis" ? "active" : ""}
+                onClick={() => selectReportChapter("anamnesis")}
               >
                 Anamnese
               </button>
               <button
-                className={reportChapter === "conclusion" ? "active" : ""}
-                onClick={() => setReportChapter("conclusion")}
+                className={!activeEditorApplicationId && view !== "results" && reportChapter === "conclusion" ? "active" : ""}
+                onClick={() => selectReportChapter("conclusion")}
               >
                 Conclusão
               </button>
               <button
-                className={reportChapter === "referral" ? "active" : ""}
-                onClick={() => setReportChapter("referral")}
+                className={!activeEditorApplicationId && view !== "results" && reportChapter === "referral" ? "active" : ""}
+                onClick={() => selectReportChapter("referral")}
               >
                 Encaminhamento
               </button>
@@ -2450,7 +2123,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <span className="section-kicker">Testes</span>
                 {selectedEvaluation.applications?.map((item) => (
                   <button
-                    className="outline-application"
+                    className={`outline-application ${activeEditorApplicationId === item.id ? "active" : ""}`}
                     key={item.id}
                     onClick={() => void openApplication(item.id)}
                   >
@@ -2470,6 +2143,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </button>
               </div>
             </aside>
+            {!activeEditorApplicationId && view !== "results" && (
             <div className="panel report-editor-content">
               <div className="report-editor-heading">
                 <div>
@@ -2688,31 +2362,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               )}
             </div>
-            </section>
-          </>
-        )}
-        {view === "editor" && !selectedEvaluation && (
-          <section className="panel empty-view">
-            <span className="section-kicker">Nenhum laudo selecionado</span>
-            <h2>Abra um laudo para começar a editar</h2>
-            <button onClick={() => navigate("reports")}>Ir para laudos</button>
-          </section>
-        )}
-        {application && application.instrumentVersion?.instrument && view === "results" && (
-          <>
-            <button
-              className="back-link"
-              type="button"
-              onClick={() =>
-                routerNavigate(
-                  selectedEvaluation?.id || application.evaluation?.id
-                    ? `/laudos/${selectedEvaluation?.id ?? application.evaluation?.id}`
-                    : "/laudos",
-                )
-              }
-            >
-              ← Voltar ao laudo
-            </button>
+            )}
+            {application && application.instrumentVersion?.instrument &&
+              application.id === activeEditorApplicationId && (
             <section className="panel workspace" id="workspace">
             <div className="workspace-header">
               <div>
@@ -3082,7 +2734,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </dl>
             )}
             </section>
+            )}
+            </section>
           </>
+        )}
+        {view === "editor" && !selectedEvaluation && (
+          <section className="panel empty-view">
+            <span className="section-kicker">Nenhum laudo selecionado</span>
+            <h2>Abra um laudo para começar a editar</h2>
+            <button onClick={() => navigate("reports")}>Ir para laudos</button>
+          </section>
         )}
         {view === "results" && (!application || !application.instrumentVersion?.instrument) && (
           <section className="panel empty-view">

@@ -15,20 +15,17 @@ import sharp from "sharp";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth.types";
 import { AuditService } from "../audit.service";
-import { classifySnapIvScore, snapIvInstrument } from "../catalog/instrument-config";
-import { scaredCDomains } from "../catalog/scared-c-config";
-
-type PresentationField = { id: string; label?: string };
-type PresentationSchema = {
-  tables?: Array<{ title?: string; columns: PresentationField[] }>;
-  charts?: Array<{
-    title?: string;
-    type: "BAR";
-    fields: PresentationField[];
-    maximum?: number;
-    expectedRange?: string;
-  }>;
-};
+import {
+  instrumentReportContent,
+  instrumentReportPresentation,
+  instrumentReportReferences,
+  instrumentReportTables,
+  scaredReportTableNote,
+  type InstrumentReportContent,
+  type InstrumentReportTable,
+  type PresentationField,
+  type PresentationSchema,
+} from "./instrument-report";
 type ReportExportOptions = {
   chapters?: Partial<Record<"coverPage" | "identification" | "demand" | "procedures" | "anamnesis" | "conclusion" | "referral" | "references" | "deliveryTerm", boolean>>;
   tests?: Record<string, { table?: boolean; chart?: boolean }>;
@@ -62,7 +59,17 @@ export class ReportsService {
     if (!evaluation) throw new NotFoundException("Avaliação não encontrada.");
     const applications = evaluation.applications.filter(
       (application) => application.result && application.status === "LOCKED",
-    );
+    ).map((application) => {
+      const result = this.asRecord(application.result);
+      const code = application.instrumentVersion.instrument.code;
+      const reportPresentation = instrumentReportPresentation(code, result, application.instrumentVersion.presentationSchema);
+      return {
+        ...application,
+        reportContent: instrumentReportContent(code),
+        reportPresentation,
+        reportTables: instrumentReportTables(code, result, reportPresentation),
+      };
+    });
     if (applications.length === 0)
       throw new NotFoundException(
         "A avaliação ainda não possui resultados calculados.",
@@ -259,53 +266,30 @@ export class ReportsService {
     let chartNumber = 1;
     for (const [applicationIndex, application] of snapshot.applications.entries()) {
       const result = this.asRecord(application.result);
-      const presentation = this.presentationSchema(
-        application.instrumentVersion.instrument.name === "SNAP-IV" && Object.keys(result).some((field) => field.startsWith("snap_iv_form_"))
-          ? snapIvInstrument.presentationSchema
-          : application.instrumentVersion.presentationSchema,
-      );
+      const code = application.instrumentVersion.instrument.code ?? application.instrumentVersion.instrument.name;
+      const content = this.reportContentFor(application);
+      const presentation = application.reportPresentation ?? instrumentReportPresentation(code, result, application.instrumentVersion.presentationSchema);
+      const tables = application.reportTables ?? instrumentReportTables(code, result, presentation);
       const options = snapshot.exportOptions.tests[application.id] ?? { table: true, chart: true };
       await this.appendGoogleTextBlock(
         document.documentId,
         token.access_token,
         [
           `4.${applicationIndex + 2}. ${application.instrumentVersion.instrument.name} — versão ${application.instrumentVersion.version}`,
-          `Base conceitual: ${this.instrumentTheoreticalContext(application.instrumentVersion.instrument.name)}`,
-          this.instrumentInterpretation(application.instrumentVersion.instrument.name),
+          `Base conceitual: ${content.theoreticalContext}`,
+          content.interpretation,
         ].join("\n"),
       );
       if (options.table) {
-        const snapIvTables = application.instrumentVersion.instrument.name === "SNAP-IV" ? this.snapIvResultTables(result) : [];
-        const scaredVersion = application.instrumentVersion.instrument.name;
-        const scaredTables = scaredVersion === "SCARED-C" || scaredVersion === "SCARED-P" ? this.scaredResultTables(result, scaredVersion) : [];
-        if (snapIvTables.length > 0) {
-          for (const table of snapIvTables)
-            await this.appendGoogleTable(document.documentId, token.access_token, `Tabela ${tableNumber++}. SNAP-IV — Formulário ${table.formNumber}`, [
-              ["Itens", "Pontuação", "Classificação"],
-              ...table.rows,
-            ]);
-        } else if (scaredTables.length > 0) {
-          for (const table of scaredTables)
-            await this.appendGoogleTable(document.documentId, token.access_token, `Tabela ${tableNumber++}. ${table.title}`, [
-              ["Dimensão", "Pontuação", "Ponto de corte", "Classificação"],
-              ...table.rows,
-            ]);
-          await this.appendGoogleTextBlock(document.documentId, token.access_token, this.scaredTableNote());
-        } else {
-          const tables: NonNullable<PresentationSchema["tables"]> = presentation.tables?.length ? presentation.tables : [{ title: "Resultados calculados", columns: Object.keys(result).map((id) => ({ id })) }];
-          for (const table of tables) {
-            const fields = table.columns
-              .filter((column) => column.id in result)
-              .map((column) => [column.label ?? column.id, result[column.id]] as [string, unknown]);
-            if (fields.length === 0) continue;
-            await this.appendGoogleResultsTable(
-              document.documentId,
-              token.access_token,
-              `Tabela ${tableNumber++}. ${table.title ?? "Resultados calculados"}`,
-              fields,
-            );
-          }
+        for (const table of tables) {
+          const title = `Tabela ${tableNumber++}. ${table.title}`;
+          if (table.kind === "matrix")
+            await this.appendGoogleTable(document.documentId, token.access_token, title, [table.headers, ...table.rows]);
+          else
+            await this.appendGoogleResultsTable(document.documentId, token.access_token, title, table.fields.map((field) => [field.label, field.value]));
         }
+        if (tables.some((table) => table.kind === "matrix") && (code === "SCARED-C" || code === "SCARED-P"))
+          await this.appendGoogleTextBlock(document.documentId, token.access_token, scaredReportTableNote);
       }
       if (options.chart) {
         for (const chart of presentation.charts ?? []) {
@@ -394,12 +378,15 @@ export class ReportsService {
       id: string;
       instrumentVersion: {
         version: string;
-        instrument: { name: string };
+        instrument: { name: string; code?: string };
         presentationSchema: unknown;
         sourceMetadata: unknown;
       };
       result: unknown;
       professionalSummary: string | null;
+      reportContent?: InstrumentReportContent;
+      reportPresentation?: PresentationSchema;
+      reportTables?: InstrumentReportTable[];
     }>;
       professional: {
       name: string;
@@ -476,7 +463,7 @@ export class ReportsService {
       if (snapshot.exportOptions.chapters.demand)
         this.renderTextSection(document, "2. Descrição da demanda", snapshot.evaluation.demandDescription || "Não informada.");
       if (snapshot.exportOptions.chapters.procedures)
-        this.renderTextSection(document, "3. Procedimentos", snapshot.applications.map((application) => `• ${application.instrumentVersion.instrument.name} — ${this.instrumentPurpose(application.instrumentVersion.instrument.name)}`).join("\n"));
+        this.renderTextSection(document, "3. Procedimentos", snapshot.applications.map((application) => `• ${application.instrumentVersion.instrument.name} — ${this.reportContentFor(application).purpose}`).join("\n"));
       const anamnesis = this.asRecord(snapshot.evaluation.anamnesis);
       if (snapshot.exportOptions.chapters.anamnesis) {
         document.moveDown().font("Helvetica-Bold").fontSize(13).fillColor("#111111").text("4. Análise dos resultados:");
@@ -490,6 +477,11 @@ export class ReportsService {
       let tableNumber = 1;
       let chartNumber = 1;
       for (const [index, application] of snapshot.applications.entries()) {
+        const result = this.asRecord(application.result);
+        const code = application.instrumentVersion.instrument.code ?? application.instrumentVersion.instrument.name;
+        const content = this.reportContentFor(application);
+        const presentation = application.reportPresentation ?? instrumentReportPresentation(code, result, application.instrumentVersion.presentationSchema);
+        const tables = application.reportTables ?? instrumentReportTables(code, result, presentation);
         document
           .font("Helvetica-Bold")
           .fontSize(12)
@@ -502,41 +494,20 @@ export class ReportsService {
           .font("Helvetica")
           .fontSize(9.5)
           .fillColor("#344054")
-          .text(`Base conceitual: ${this.instrumentTheoreticalContext(application.instrumentVersion.instrument.name)}`, { align: "justify", lineGap: 2 })
+          .text(`Base conceitual: ${content.theoreticalContext}`, { align: "justify", lineGap: 2 })
           .moveDown(0.35)
-          .text(this.instrumentInterpretation(application.instrumentVersion.instrument.name), { align: "justify", lineGap: 2 });
-        const result = this.asRecord(application.result);
-        const presentation = this.presentationSchema(
-          application.instrumentVersion.instrument.name === "SNAP-IV" && Object.keys(result).some((field) => field.startsWith("snap_iv_form_"))
-            ? snapIvInstrument.presentationSchema
-            : application.instrumentVersion.presentationSchema,
-        );
-        const tables = presentation.tables?.length
-          ? presentation.tables
-          : [
-              {
-                title: "Resultados calculados",
-                columns: Object.keys(result).map((id) => ({ id })),
-              },
-            ];
+          .text(content.interpretation, { align: "justify", lineGap: 2 });
         const testOptions = snapshot.exportOptions.tests[application.id] ?? { table: true, chart: true };
         if (testOptions.table) {
-          const snapIvTables = application.instrumentVersion.instrument.name === "SNAP-IV" ? this.snapIvResultTables(result) : [];
-          const scaredVersion = application.instrumentVersion.instrument.name;
-          const scaredTables = scaredVersion === "SCARED-C" || scaredVersion === "SCARED-P" ? this.scaredResultTables(result, scaredVersion) : [];
-          if (snapIvTables.length > 0) {
-            for (const table of snapIvTables)
-              this.renderResultTable(document, `Tabela ${tableNumber++}. SNAP-IV — Formulário ${table.formNumber}`, ["Itens", "Pontuação", "Classificação"], table.rows);
-          } else if (scaredTables.length > 0) {
-            for (const table of scaredTables)
-              this.renderResultTable(document, `Tabela ${tableNumber++}. ${table.title}`, ["Dimensão", "Pontuação", "Ponto de corte", "Classificação"], table.rows);
-            document.moveDown(0.2).font("Helvetica").fontSize(8.5).fillColor("#344054").text(this.scaredTableNote(), { align: "justify" });
-          } else {
-            for (const table of tables) {
-              if (!table.columns.some((column) => column.id in result)) continue;
-              this.renderTable(document, { ...table, title: `Tabela ${tableNumber++}. ${table.title ?? "Resultados calculados"}` }, result);
-            }
+          for (const table of tables) {
+            const title = `Tabela ${tableNumber++}. ${table.title}`;
+            if (table.kind === "matrix")
+              this.renderResultTable(document, title, table.headers, table.rows);
+            else
+              this.renderTable(document, { title, columns: table.fields.map(({ id, label }) => ({ id, label })) }, Object.fromEntries(table.fields.map(({ id, value }) => [id, value])));
           }
+          if (tables.some((table) => table.kind === "matrix") && (code === "SCARED-C" || code === "SCARED-P"))
+            document.moveDown(0.2).font("Helvetica").fontSize(8.5).fillColor("#344054").text(scaredReportTableNote, { align: "justify" });
         }
         if (testOptions.chart)
           for (const chart of presentation.charts ?? []) {
@@ -562,7 +533,7 @@ export class ReportsService {
       this.renderTextSection(document, "Observações sobre o uso do documento", this.reportUsageNotices());
       if (snapshot.professional) this.renderSignature(document, snapshot.professional, snapshot.evaluation.applicationDate);
       if (snapshot.exportOptions.chapters.references)
-        this.renderTextSection(document, "7. Referências bibliográficas", this.referencesFor(snapshot.applications.map((application) => application.instrumentVersion.instrument.name)));
+        this.renderTextSection(document, "7. Referências bibliográficas", instrumentReportReferences(snapshot.applications.map((application) => this.reportContentFor(application))));
       if (snapshot.exportOptions.chapters.deliveryTerm)
         this.renderTextSection(document, "8. Termo de entrega", this.deliveryTermText(snapshot.professional?.name));
       this.renderPageFooters(document, snapshot.professional, hasCoverPage);
@@ -801,7 +772,7 @@ export class ReportsService {
   private googleDocumentText(snapshot: {
     evaluation: { title: string; applicationDate: Date | string | null; requester: string | null; purpose: string | null; demandDescription: string | null; anamnesis: unknown; conclusion: string | null; referral: string | null };
     patient: { name: string; birthDate: Date | string | null };
-    applications: Array<{ id: string; instrumentVersion: { version: string; instrument: { name: string }; presentationSchema: unknown }; result: unknown; professionalSummary: string | null }>;
+    applications: Array<{ id: string; instrumentVersion: { version: string; instrument: { name: string; code?: string }; presentationSchema: unknown }; result: unknown; professionalSummary: string | null; reportContent?: InstrumentReportContent; reportPresentation?: PresentationSchema; reportTables?: InstrumentReportTable[] }>;
     professional: {
       name: string;
       email?: string | null;
@@ -835,7 +806,7 @@ export class ReportsService {
       snapshot.evaluation.applicationDate ? `Data da aplicação: ${this.formatSnapshotDate(snapshot.evaluation.applicationDate)}` : null,
     ]);
     section(snapshot.exportOptions.chapters.demand, "2. Descrição da demanda", [snapshot.evaluation.demandDescription || "Não informada."]);
-    section(snapshot.exportOptions.chapters.procedures, "3. Procedimentos", snapshot.applications.map((application) => `• ${application.instrumentVersion.instrument.name} — ${this.instrumentPurpose(application.instrumentVersion.instrument.name)}`));
+    section(snapshot.exportOptions.chapters.procedures, "3. Procedimentos", snapshot.applications.map((application) => `• ${application.instrumentVersion.instrument.name} — ${this.reportContentFor(application).purpose}`));
     if (snapshot.exportOptions.chapters.anamnesis) {
       lines.push("4. Análise dos resultados", "");
       lines.push("4.1. Anamnese", "");
@@ -972,7 +943,7 @@ export class ReportsService {
         "",
       );
     }
-    section(snapshot.exportOptions.chapters.references, "7. Referências bibliográficas", this.referencesFor(snapshot.applications.map((application) => application.instrumentVersion.instrument.name)));
+    section(snapshot.exportOptions.chapters.references, "7. Referências bibliográficas", instrumentReportReferences(snapshot.applications.map((application) => this.reportContentFor(application))));
     section(snapshot.exportOptions.chapters.deliveryTerm, "8. Termo de entrega", this.deliveryTermText(snapshot.professional?.name));
     return lines.filter(Boolean).join("\n").trimEnd();
   }
@@ -1486,88 +1457,11 @@ export class ReportsService {
       : {};
   }
 
-  private presentationSchema(value: unknown): PresentationSchema {
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? (value as PresentationSchema)
-      : {};
-  }
-
-  private snapIvResultTables(result: Record<string, unknown>) {
-    const formNumbers = [...new Set(Object.keys(result)
-      .map((field) => field.match(/^snap_iv_form_(\d+)_(?:inattention|hyperactivity_impulsivity|opposition_defiance)_score$/)?.[1])
-      .filter((number): number is string => Boolean(number))
-      .map(Number))].sort((first, second) => first - second);
-    const domains = [
-      { key: "inattention", label: "Desatenção" },
-      { key: "hyperactivity_impulsivity", label: "Hiperatividade/Impulsividade" },
-      { key: "opposition_defiance", label: "Oposição/Desafio" },
-    ];
-    return formNumbers.map((formNumber) => ({
-      formNumber,
-      rows: domains.flatMap((domain) => {
-        const prefix = `snap_iv_form_${formNumber}_${domain.key}`;
-        const score = Number(result[`${prefix}_score`]);
-        if (!Number.isFinite(score) || !(`${prefix}_score` in result)) return [];
-        const storedClassification = result[`${prefix}_classification`];
-        const classification = typeof storedClassification === "string" && storedClassification.trim()
-          ? storedClassification
-          : classifySnapIvScore(score, domain.key === "opposition_defiance");
-        return [[domain.label, String(score), classification]];
-      }),
-    }));
-  }
-
-  private scaredResultTables(result: Record<string, unknown>, version: "SCARED-C" | "SCARED-P") {
-    if (version === "SCARED-C") {
-      const rows = this.scaredResultRows(result, "scared_c");
-      return rows.length > 0 ? [{ title: "SCARED-C — Escores e pontos de atenção", rows }] : [];
-    }
-    const formNumbers = [...new Set(Object.keys(result)
-      .map((field) => field.match(/^scared_p_form_(\d+)_total$/)?.[1])
-      .filter((number): number is string => Boolean(number))
-      .map(Number))].sort((first, second) => first - second);
-    if (formNumbers.length === 0) {
-      const rows = this.scaredResultRows(result, "scared_p");
-      return rows.length > 0 ? [{ title: `SCARED-P — Respondente 1 (${this.scaredRespondentLabel(result, "scared_p")})`, rows }] : [];
-    }
-    return formNumbers.flatMap((formNumber) => {
-      const prefix = `scared_p_form_${formNumber}`;
-      const rows = this.scaredResultRows(result, prefix);
-      return rows.length > 0 ? [{ title: `SCARED-P — Respondente ${formNumber} (${this.scaredRespondentLabel(result, prefix)})`, rows }] : [];
-    });
-  }
-
-  private scaredResultRows(result: Record<string, unknown>, prefix: string) {
-    const indicators = [
-      { id: "total", label: "Pontuação total", cutoff: 25 },
-      ...scaredCDomains.map((domain) => ({
-        id: domain.id,
-        label: domain.id === "panic_somatic" ? "Pânico/Sintomas somáticos"
-          : domain.id === "separation_anxiety" ? "Ansiedade de separação"
-            : domain.label,
-        cutoff: domain.cutoff,
-      })),
-    ];
-    return indicators.flatMap((indicator) => {
-      const field = indicator.id === "total" ? `${prefix}_total` : `${prefix}_${indicator.id}_score`;
-      const score = Number(result[field]);
-      if (!(field in result) || !Number.isFinite(score)) return [];
-      return [[
-        indicator.label,
-        String(score),
-        String(indicator.cutoff),
-        score >= indicator.cutoff ? "Ponto de atenção" : "Abaixo do corte",
-      ]];
-    });
-  }
-
-  private scaredTableNote() {
-    return "Pontuação: soma dos itens da dimensão (0 a 2 por item; total de 0 a 82). Ponto de corte: referência de rastreamento da ficha original. Atingir o corte sugere investigação clínica; ficar abaixo dele não exclui sintomas ou transtorno.";
-  }
-
-  private scaredRespondentLabel(result: Record<string, unknown>, prefix: string) {
-    const respondent = String(result[`${prefix}_respondent`] ?? "");
-    return ({ mother: "Mãe", father: "Pai", caregiver: "Cuidador(a)" }[respondent as "mother" | "father" | "caregiver"] ?? respondent) || "Não informado";
+  private reportContentFor(application: {
+    reportContent?: InstrumentReportContent;
+    instrumentVersion: { instrument: { code?: string; name: string } };
+  }) {
+    return application.reportContent ?? instrumentReportContent(application.instrumentVersion.instrument.code ?? application.instrumentVersion.instrument.name);
   }
 
   private renderResultTable(document: PDFKit.PDFDocument, title: string, headers: string[], rows: string[][]) {
@@ -1743,72 +1637,6 @@ export class ReportsService {
     );
     if (today < birthdayThisYear) age -= 1;
     return age;
-  }
-
-  private instrumentPurpose(name: string) {
-    if (name === "ASRS-18")
-      return "avaliar a frequência de manifestações de desatenção e hiperatividade/impulsividade em adultos, auxiliando na identificação de casos que requerem avaliação clínica aprofundada.";
-    if (name === "SNAP-IV")
-      return "avaliar relatos de desatenção, hiperatividade/impulsividade e oposição/desafio em crianças e adolescentes.";
-    if (name === "SCARED-C")
-      return "rastrear sintomas de ansiedade em crianças e adolescentes por autorrelato, considerando o escore total e cinco domínios.";
-    if (name === "SCARED-P")
-      return "rastrear sintomas de ansiedade em crianças e adolescentes a partir do relato de pais ou cuidadores, considerando o escore total e cinco domínios.";
-    return "instrumento aplicado conforme a versão técnica selecionada para esta avaliação.";
-  }
-
-  private instrumentTheoreticalContext(name: string) {
-    if (name === "ASRS-18")
-      return "A ASRS-18 é uma escala de autorrelato voltada ao rastreamento de manifestações de desatenção e hiperatividade/impulsividade em adultos. Seus indicadores descrevem frequência de sintomas e devem ser compreendidos à luz do funcionamento cotidiano, da história clínica e de outras fontes da avaliação.";
-    if (name === "SNAP-IV")
-      return "A SNAP-IV de 26 itens reúne relatos sobre desatenção (itens 1–9), hiperatividade/impulsividade (10–18) e oposição/desafio (19–26). Cada item recebe de 0 a 3 pontos; as pontuações são somadas por domínio.";
-    if (name === "SCARED-C")
-      return "O SCARED-C reúne 41 itens de autorrelato referentes aos últimos três meses. Cada item vale de 0 a 2 pontos; o total varia de 0 a 82 e os itens se distribuem em pânico/somático, ansiedade generalizada, separação, ansiedade social e evitação escolar.";
-    if (name === "SCARED-P")
-      return "O SCARED-P reúne 41 itens respondidos por pais ou cuidadores sobre os últimos três meses. Cada item vale de 0 a 2 pontos; o total varia de 0 a 82 e os itens se distribuem em pânico/somático, ansiedade generalizada, separação, ansiedade social e evitação escolar.";
-    return "O instrumento contribui com indicadores específicos que devem ser integrados às demais fontes técnicas, clínicas e contextuais do processo avaliativo.";
-  }
-
-  private instrumentInterpretation(name: string) {
-    if (name === "ASRS-18")
-      return "A escala organiza indicadores de desatenção e de hiperatividade/impulsividade referentes aos últimos seis meses. O resultado é de rastreamento e deve ser integrado à avaliação clínica, ao histórico de desenvolvimento e aos prejuízos funcionais observados.";
-    if (name === "SNAP-IV")
-      return "As classificações por domínio seguem faixas sugeridas no guia de pontuação da SNAP-IV de 26 itens. Os resultados são indicadores de rastreamento e devem ser interpretados com entrevista clínica, histórico e informações de outros contextos.";
-    if (name === "SCARED-C")
-      return "Os escores e pontos de atenção seguem a ficha original e indicam necessidade de investigação, não diagnóstico. Os enunciados em português da plataforma são tradução operacional não validada; conferir a adaptação e as normas adotadas antes do uso clínico.";
-    if (name === "SCARED-P")
-      return "Os escores e pontos de atenção da versão pais seguem a ficha original e indicam necessidade de investigação, não diagnóstico. Comparações com o autorrelato da criança devem considerar as diferenças entre informantes. Os enunciados em português foram fornecidos para esta configuração e não tiveram correspondência com adaptação validada verificada; conferir a versão e as normas adotadas antes do uso clínico.";
-    return "Os resultados a seguir devem ser analisados em conjunto com os demais dados clínicos e contextuais da avaliação.";
-  }
-
-  private referencesFor(instruments: string[]) {
-    const references: string[] = [];
-    if (instruments.includes("ASRS-18")) {
-      references.push(
-        "Kessler, R. C. et al. The World Health Organization Adult ADHD Self-Report Scale (ASRS). Psychological Medicine, 2005.",
-        "Harvard Medical School. ASRS Scales and Checklists.",
-        "Mattos, P. et al. Adaptação transcultural da ASRS para o português. Revista de Psiquiatria Clínica, 2006.",
-      );
-    }
-    if (instruments.includes("SNAP-IV")) {
-      references.push(
-        "UCSF Child and Adolescent Psychiatry Portal. SNAP-IV 26-Item Teacher and Parent Rating Scale: scoring guide. https://capp.ucsf.edu/sites/g/files/tkssra5836/f/SNAP-IV-26-item-Teacher-and-Parent-rating-scale.pdf",
-      );
-    }
-    if (instruments.includes("SCARED-C")) {
-      references.push(
-        "Birmaher, B. et al. The Screen for Child Anxiety Related Emotional Disorders (SCARED): scale construction and psychometric characteristics. JACAAP, 1997. https://pubmed.ncbi.nlm.nih.gov/9100430/",
-        "University of Pittsburgh. SCARED Child Version (41 items), formulário e guia de pontuação. https://www.pediatricbipolar.pitt.edu/sites/default/files/assets/SCAREDChildVersion_1.19.18.pdf",
-      );
-    }
-    if (instruments.includes("SCARED-P")) {
-      if (!references.some((reference) => reference.startsWith("Birmaher, B. et al. The Screen for Child Anxiety")))
-        references.push("Birmaher, B. et al. The Screen for Child Anxiety Related Emotional Disorders (SCARED): scale construction and psychometric characteristics. JACAAP, 1997. https://pubmed.ncbi.nlm.nih.gov/9100430/");
-      references.push("University of Pittsburgh. SCARED Parent Version (41 items), formulário e guia de pontuação. https://pediatricbipolar.pitt.edu/sites/default/files/assets/SCAREDParentVersion_1.19.18_0.pdf");
-    }
-    return references.length > 0
-      ? references.map((reference) => `• ${reference}`).join("\n")
-      : "Referências técnicas do instrumento utilizado disponíveis no cadastro da plataforma.";
   }
 
   private displayValue(value: unknown) {

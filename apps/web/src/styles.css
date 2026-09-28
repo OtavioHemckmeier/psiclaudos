@@ -286,7 +286,6 @@ h2 {
 }
 .workspace {
   margin-top: 20px;
-  border-top: 3px solid #23a99d;
 }
 .workspace-header {
   display: flex;
@@ -474,10 +473,15 @@ li span {
   background: linear-gradient(180deg, #fbfcfd 0, #f4f5f7 320px);
 }
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   flex-direction: column;
   gap: 1.2rem;
+  overflow-y: auto;
   padding: 1.25rem;
   border-right: 1px solid #e3e7ee;
   background: #fff;
@@ -1666,12 +1670,20 @@ li span {
   background: #f8fafc;
   text-align: left;
 }
+.report-outline-tests .outline-application.active {
+  color: #168f85;
+  background: #e8f7f4;
+}
 .report-outline-tests .outline-application small {
   color: #8a919d;
   font-size: 0.62rem;
 }
 .report-editor-content {
   min-height: 620px;
+}
+.report-editor > .workspace {
+  min-width: 0;
+  margin-top: 0;
 }
 .report-editor-heading {
   display: flex;
@@ -2037,7 +2049,6 @@ li span {
 }
 .workspace {
   margin-top: 1.2rem;
-  border-top: 3px solid #23a99d;
 }
 .form-sections {
   display: grid;
@@ -2125,7 +2136,7 @@ li span {
 }
 .scared-choice-header {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) repeat(3, minmax(0, 0.25fr));
+  grid-template-columns: minmax(280px, 1fr) repeat(3, minmax(calc(430px / 3), 0.283333fr));
   border-bottom: 1px solid #d8e3f0;
   color: #344054;
   background: #f3f8fe;
@@ -2820,15 +2831,18 @@ li span {
     grid-template-columns: 1fr;
   }
   .asrs-form-sections .instrument-field,
-  .snapiv-form-sections .instrument-field {
+  .snapiv-form-sections .instrument-field,
+  .scared-form-sections .instrument-field {
     grid-template-columns: 1fr;
   }
   .asrs-choice-header,
-  .snapiv-choice-header {
+  .snapiv-choice-header,
+  .scared-choice-header {
     display: none;
   }
   .asrs-choice-list,
-  .snapiv-choice-list {
+  .snapiv-choice-list,
+  .scared-choice-list {
     border-top: 1px solid #e3eaf2;
     border-left: 0;
   }

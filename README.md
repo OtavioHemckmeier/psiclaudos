@@ -8,6 +8,7 @@ Monorepo inicial para a plataforma de apoio à correção de instrumentos psicol
 - `apps/api`: API NestJS.
 - `packages/contracts`: tipos e contratos compartilhados.
 - `packages/rule-engine`: motor de regras independente.
+- `docs/ARQUITETURA_INSTRUMENTOS.md`: mapa do cadastro, cálculo e exportação dos instrumentos.
 - `infra/docker`: serviços locais.
 - `PLANO_IMPLEMENTACAO.md`: plano e checklists do projeto.
 
