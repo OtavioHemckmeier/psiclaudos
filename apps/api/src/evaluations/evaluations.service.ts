@@ -7,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth.types";
 import { AuditService } from "../audit.service";
+import { snapIvInstrument } from "../catalog/instrument-config";
 
 export type EvaluationInput = {
   patientId: string;
@@ -221,7 +222,7 @@ export class EvaluationsService {
           "InstrumentApplication",
           application.id,
         );
-        return application;
+        return this.getApplication(user, application.id);
       });
   }
 
@@ -234,7 +235,48 @@ export class EvaluationsService {
       },
     });
     if (!application) throw new NotFoundException("Aplicação não encontrada.");
-    return application;
+    if (application.instrumentVersion.instrument.code !== "SNAP-IV") return application;
+
+    const legacySchema = application.instrumentVersion.formSchema as unknown as {
+      sections?: Array<{ fields?: Array<{ id: string; label?: string; options?: Array<{ value: string; label: string }> }> }>;
+    };
+    const answers = { ...((application.answers ?? {}) as Record<string, unknown>) };
+    const legacyFields = (legacySchema.sections ?? []).flatMap((section) => section.fields ?? []);
+    const legacyRespondent = legacyFields.find((field) => /respondente|informante/i.test(`${field.id} ${field.label ?? ""}`));
+    const canonicalFields = snapIvInstrument.formSchema.sections.flatMap((section) => section.fields);
+    const canonicalRespondent = canonicalFields.find((field) => field.id === "snap_iv_form_1_respondent");
+    const canonicalItems = canonicalFields.filter((field) => /^snap_iv_form_1_item_\d+$/.test(field.id));
+
+    if (legacyRespondent && canonicalRespondent && answers[legacyRespondent.id] !== undefined) {
+      const oldValue = String(answers[legacyRespondent.id]);
+      const oldLabel = legacyRespondent.options?.find((option) => option.value === oldValue)?.label ?? oldValue;
+      const normalizedLabel = oldLabel.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const standardRespondents: Record<string, string> = {
+        autorelato: "self",
+        mae: "mother",
+        pai: "father",
+        professor: "teacher",
+      };
+      answers[canonicalRespondent.id] = standardRespondents[normalizedLabel] ?? oldLabel;
+    }
+    const legacyItems = legacyFields
+      .filter((field) => field.id !== legacyRespondent?.id && field.options?.length === 4)
+      .slice(0, canonicalItems.length);
+    legacyItems.forEach((field, index) => {
+      if (answers[field.id] !== undefined) answers[canonicalItems[index].id] = answers[field.id];
+    });
+
+    return {
+      ...application,
+      answers: answers as typeof application.answers,
+      instrumentVersion: {
+        ...application.instrumentVersion,
+        formSchema: snapIvInstrument.formSchema as unknown as typeof application.instrumentVersion.formSchema,
+        rules: snapIvInstrument.rules as unknown as typeof application.instrumentVersion.rules,
+        outputSchema: snapIvInstrument.outputSchema as unknown as typeof application.instrumentVersion.outputSchema,
+        presentationSchema: snapIvInstrument.presentationSchema as unknown as typeof application.instrumentVersion.presentationSchema,
+      },
+    };
   }
 
   async saveAnswers(

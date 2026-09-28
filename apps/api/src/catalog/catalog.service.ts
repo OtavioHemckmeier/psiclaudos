@@ -2,7 +2,9 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
-import { asrs18Instrument, demoInstrument } from './instrument-config';
+import { asrs18Instrument, demoInstrument, snapIvInstrument } from './instrument-config';
+import { scaredCInstrument } from './scared-c-config';
+import { scaredPInstrument } from './scared-p-config';
 import { validateRules } from '@laudo/rule-engine';
 import type { InstrumentRule } from '@laudo/contracts';
 
@@ -22,10 +24,141 @@ export class CatalogService {
 
   async seedDemo() {
     await this.seedAsrs18();
+    await this.seedSnapIv();
+    await this.seedScaredC();
+    await this.seedScaredP();
     const existing = await this.prisma.instrumentDefinition.findUnique({ where: { code: demoInstrument.code } });
     if (existing) { await this.prisma.instrumentVersion.updateMany({ where: { instrumentId: existing.id, version: demoInstrument.version }, data: { presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue } }); return existing; }
     const contentHash = createHash('sha256').update(JSON.stringify(demoInstrument)).digest('hex');
     return this.prisma.instrumentDefinition.create({ data: { code: demoInstrument.code, name: demoInstrument.name, description: 'Configuração técnica sem conteúdo clínico protegido.', category: 'DEMONSTRATION', versions: { create: { version: demoInstrument.version, status: 'PUBLISHED', formSchema: demoInstrument.formSchema as unknown as Prisma.InputJsonValue, rules: demoInstrument.rules as unknown as Prisma.InputJsonValue, outputSchema: demoInstrument.outputSchema as unknown as Prisma.InputJsonValue, presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue, contentHash, publishedAt: new Date(), sourceMetadata: { type: 'INTERNAL_DEMO' }, licenseMetadata: { status: 'DEMONSTRATION_ONLY' } } } } });
+  }
+
+  private async seedScaredC() {
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: scaredCInstrument.code },
+      update: { name: scaredCInstrument.name, description: 'Inventário de Ansiedade Infantil — Versão Criança.', category: 'Ansiedade', status: 'ACTIVE' },
+      create: { code: scaredCInstrument.code, name: scaredCInstrument.name, description: 'Inventário de Ansiedade Infantil — Versão Criança.', category: 'Ansiedade' },
+    });
+    const contentHash = createHash('sha256').update(JSON.stringify(scaredCInstrument)).digest('hex');
+    const versionData = {
+      formSchema: scaredCInstrument.formSchema as unknown as Prisma.InputJsonValue,
+      rules: scaredCInstrument.rules as unknown as Prisma.InputJsonValue,
+      outputSchema: scaredCInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+      presentationSchema: scaredCInstrument.presentationSchema as unknown as Prisma.InputJsonValue,
+      contentHash,
+      sourceMetadata: { platform: {
+        subtitle: 'Inventário de Ansiedade Infantil — Versão Criança',
+        audience: 'Crianças e adolescentes',
+        authors: 'Birmaher, Khetarpal, Brent, Cully, Balach, Kaufman e Neer',
+        itemCount: 41,
+        format: 'Autorrelato',
+        purpose: 'Rastreamento de ansiedade',
+        domains: ['Pânico/somático', 'Ansiedade generalizada', 'Separação', 'Ansiedade social', 'Evitação escolar'],
+        professionalUse: 'Instrumento não privativo de psicólogos',
+        applicationEnabled: true,
+      } } as Prisma.InputJsonValue,
+      licenseMetadata: { status: 'OFFICIAL_ENGLISH_SOURCE_PORTUGUESE_TRANSLATION_NOT_VALIDATED', source: 'https://www.pediatricbipolar.pitt.edu/sites/default/files/assets/SCAREDChildVersion_1.19.18.pdf' } as Prisma.InputJsonValue,
+    };
+    const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: scaredCInstrument.version } });
+    if (existing) {
+      await this.prisma.instrumentVersion.update({ where: { id: existing.id }, data: versionData });
+      return;
+    }
+    await this.prisma.instrumentVersion.create({ data: {
+      instrumentId: instrument.id,
+      version: scaredCInstrument.version,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      ...versionData,
+    } });
+  }
+
+  private async seedScaredP() {
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: scaredPInstrument.code },
+      update: { name: scaredPInstrument.name, description: 'Inventário de Ansiedade Infantil — Versão Pais.', category: 'Ansiedade', status: 'ACTIVE' },
+      create: { code: scaredPInstrument.code, name: scaredPInstrument.name, description: 'Inventário de Ansiedade Infantil — Versão Pais.', category: 'Ansiedade' },
+    });
+    const contentHash = createHash('sha256').update(JSON.stringify(scaredPInstrument)).digest('hex');
+    const versionData = {
+      formSchema: scaredPInstrument.formSchema as unknown as Prisma.InputJsonValue,
+      rules: scaredPInstrument.rules as unknown as Prisma.InputJsonValue,
+      outputSchema: scaredPInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+      presentationSchema: scaredPInstrument.presentationSchema as unknown as Prisma.InputJsonValue,
+      contentHash,
+      sourceMetadata: { platform: {
+        subtitle: 'Inventário de Ansiedade Infantil — Versão Pais',
+        audience: 'Crianças e adolescentes',
+        authors: 'Birmaher, Khetarpal, Brent, Cully, Balach, Kaufman e Neer',
+        itemCount: 41,
+        format: 'Questionário para pais/cuidadores',
+        purpose: 'Rastreamento de ansiedade',
+        domains: ['Pânico/somático', 'Ansiedade generalizada', 'Separação', 'Ansiedade social', 'Evitação escolar'],
+        professionalUse: 'Instrumento não privativo de psicólogos',
+        applicationEnabled: true,
+      } } as Prisma.InputJsonValue,
+      licenseMetadata: { status: 'USER_PROVIDED_PORTUGUESE_ITEMS_PENDING_PROFESSIONAL_VALIDATION', source: 'https://pediatricbipolar.pitt.edu/sites/default/files/assets/SCAREDParentVersion_1.19.18_0.pdf' } as Prisma.InputJsonValue,
+    };
+    const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: scaredPInstrument.version } });
+    if (existing) {
+      await this.prisma.instrumentVersion.update({ where: { id: existing.id }, data: versionData });
+      return;
+    }
+    await this.prisma.instrumentVersion.create({ data: {
+      instrumentId: instrument.id,
+      version: scaredPInstrument.version,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      ...versionData,
+    } });
+  }
+
+  private async seedSnapIv() {
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: snapIvInstrument.code },
+      update: { name: snapIvInstrument.name, description: 'Questionário para sintomas de TDAH e TDO.', category: 'TDAH', status: 'ACTIVE' },
+      create: { code: snapIvInstrument.code, name: snapIvInstrument.name, description: 'Questionário para sintomas de TDAH e TDO.', category: 'TDAH' },
+    });
+    const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: snapIvInstrument.version } });
+    const contentHash = createHash('sha256').update(JSON.stringify(snapIvInstrument)).digest('hex');
+    if (existing) {
+      await this.prisma.instrumentVersion.update({
+        where: { id: existing.id },
+        data: {
+          formSchema: snapIvInstrument.formSchema as unknown as Prisma.InputJsonValue,
+          rules: snapIvInstrument.rules as unknown as Prisma.InputJsonValue,
+          outputSchema: snapIvInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+          presentationSchema: snapIvInstrument.presentationSchema as Prisma.InputJsonValue,
+          contentHash,
+        },
+      });
+      return;
+    }
+    await this.prisma.instrumentVersion.create({
+      data: {
+        instrumentId: instrument.id,
+        version: snapIvInstrument.version,
+        status: 'PUBLISHED',
+        formSchema: snapIvInstrument.formSchema as unknown as Prisma.InputJsonValue,
+        rules: snapIvInstrument.rules as unknown as Prisma.InputJsonValue,
+        outputSchema: snapIvInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+        presentationSchema: snapIvInstrument.presentationSchema as unknown as Prisma.InputJsonValue,
+        contentHash,
+        publishedAt: new Date(),
+        sourceMetadata: { platform: {
+          subtitle: 'Questionário para Sintomas de TDAH e TDO',
+          audience: 'Crianças e adolescentes',
+          authors: 'Swanson, JM, Schuck, S., Porter, MM, Carlson, C., Hartman, CA, Sergeant, JA, Clevenger, W., Wasdell, M., McCleary, R., Lakes, K., & Wigal, T',
+          itemCount: 26,
+          format: 'Questionário para pais/professores',
+          purpose: 'Rastreamento comportamental',
+          domains: ['Desatenção', 'Hiperatividade/impulsividade', 'Oposição/desafio'],
+          professionalUse: 'Instrumento não privativo de psicólogos',
+          applicationEnabled: true,
+        } },
+        licenseMetadata: { status: 'USER_PROVIDED_CONTENT_PENDING_PROFESSIONAL_VALIDATION' },
+      },
+    });
   }
 
   private async seedAsrs18() {

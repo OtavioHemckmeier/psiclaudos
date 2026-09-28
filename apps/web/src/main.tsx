@@ -7,6 +7,9 @@ import {
   useNavigate,
 } from "react-router-dom";
 import "./styles.css";
+import { SnapIvCard, SnapIvPage } from "./snap-iv";
+import { ScaredCCard, ScaredCPage } from "./scared-c";
+import { ScaredPCard, ScaredPPage, ScaredPResults } from "./scared-p";
 
 const API = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -328,7 +331,7 @@ const viewDetails: Record<WorkspaceView, { title: string; subtitle: string }> =
       subtitle: "Conheça os instrumentos disponíveis para as avaliações.",
     },
     platformTest: {
-      title: "ASRS-18",
+      title: "Detalhes do instrumento",
       subtitle: "Informações técnicas e critérios de utilização do instrumento.",
     },
     profile: {
@@ -358,6 +361,24 @@ const statusLabel = (status?: string) =>
 
 const statusClassName = (status?: string) =>
   `status status-${(status ?? "draft").toLowerCase().replaceAll("_", "-")}`;
+
+const savedSnapIvFormCount = (answers: Record<string, unknown>) =>
+  Math.max(
+    1,
+    ...Object.keys(answers)
+      .map((fieldId) => fieldId.match(/^snap_iv_form_(\d+)(?:_|$)/)?.[1])
+      .filter((formNumber): formNumber is string => Boolean(formNumber))
+      .map(Number),
+  );
+
+const savedScaredPFormCount = (answers: Record<string, unknown>) =>
+  Math.max(
+    1,
+    ...Object.keys(answers)
+      .map((fieldId) => fieldId.match(/^scared_p_form_(\d+)(?:_|$)/)?.[1])
+      .filter((formNumber): formNumber is string => Boolean(formNumber))
+      .map(Number),
+  );
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const accessToken = localStorage.getItem("laudo_token");
@@ -414,6 +435,8 @@ function InstrumentFieldControl({
   disabled: boolean;
   onChange: (value: unknown) => void;
 }) {
+  const [newRespondent, setNewRespondent] = useState("");
+  const [customRespondents, setCustomRespondents] = useState<string[]>([]);
   if (field.type === "TEXTAREA") {
     return (
       <textarea
@@ -466,9 +489,10 @@ function InstrumentFieldControl({
     field.type === "SINGLE_CHOICE" ||
     (field.type === "SCALE" && field.options?.length)
   ) {
-    if (field.id.startsWith("asrs_")) {
+    if (field.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(field.id) || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id)) {
+      const isSnapIv = field.id.startsWith("snap_iv_");
       return (
-        <div className="asrs-choice-list">
+        <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id) ? "scared-choice-list" : isSnapIv ? "snapiv-choice-list" : "asrs-choice-list"}>
           {field.options?.map((option) => (
             <label key={option.value} title={option.label}>
               <input
@@ -482,6 +506,57 @@ function InstrumentFieldControl({
               <span>{option.label}</span>
             </label>
           ))}
+        </div>
+      );
+    }
+    if (field.id.endsWith("_respondent")) {
+      const selectedValue = String(value ?? "");
+      const options = [...(field.options ?? [])];
+      for (const respondent of [...customRespondents, selectedValue]) {
+        if (respondent && !options.some((option) => option.value === respondent)) {
+          options.push({ value: respondent, label: respondent });
+        }
+      }
+      const addRespondent = () => {
+        const respondent = newRespondent.trim();
+        if (!respondent) return;
+        setCustomRespondents((current) => [...new Set([...current, respondent])]);
+        onChange(respondent);
+        setNewRespondent("");
+      };
+      return (
+        <div className="snapiv-respondent-control">
+          <select
+            disabled={disabled}
+            value={selectedValue}
+            onChange={(event) => onChange(event.target.value)}
+            required={field.required}
+          >
+            <option value="">Selecione</option>
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="snapiv-add-respondent">
+            <input
+              aria-label="Novo Respondente"
+              disabled={disabled}
+              placeholder="Novo Respondente"
+              value={newRespondent}
+              onChange={(event) => setNewRespondent(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addRespondent();
+                }
+              }}
+            />
+            <button type="button" disabled={disabled || !newRespondent.trim()} onClick={addRespondent}>
+              + Adicionar
+            </button>
+          </div>
         </div>
       );
     }
@@ -515,6 +590,168 @@ function InstrumentFieldControl({
       onChange={(event) => onChange(event.target.value)}
       required={field.required}
     />
+  );
+}
+
+const snapIvResultDomains = [
+  { key: "inattention", label: "Desatenção", description: "Avalia dificuldades de concentração e organização." },
+  { key: "hyperactivity_impulsivity", label: "Hiperatividade/Impulsividade", description: "Avalia agitação, inquietude e atitudes impulsivas." },
+  { key: "opposition_defiance", label: "Oposição/Desafio", description: "Avalia comportamentos desafiadores e de oposição a regras." },
+];
+
+function snapIvClassification(score: number, opposition: boolean) {
+  const firstCutoff = opposition ? 8 : 13;
+  const secondCutoff = opposition ? 14 : 18;
+  const thirdCutoff = opposition ? 19 : 23;
+  if (score < firstCutoff) return "Sintomas Não Significativos";
+  if (score < secondCutoff) return "Sintomas Leves";
+  if (score < thirdCutoff) return "Sintomas Moderados";
+  return "Sintomas Graves";
+}
+
+function SnapIvResults({
+  result,
+  answers,
+  summary,
+  disabled,
+  onSummaryChange,
+  onSave,
+}: {
+  result: Record<string, unknown>;
+  answers: Record<string, unknown>;
+  summary: string;
+  disabled: boolean;
+  onSummaryChange: (value: string) => void;
+  onSave: () => void;
+}) {
+  const [view, setView] = useState<"table" | "chart">("table");
+  const [selectedForm, setSelectedForm] = useState(1);
+  const forms = [...new Set(Object.keys(result)
+    .map((fieldId) => fieldId.match(/^snap_iv_form_(\d+)_(?:inattention|hyperactivity_impulsivity|opposition_defiance)_score$/)?.[1])
+    .filter((formNumber): formNumber is string => Boolean(formNumber))
+    .map(Number))].sort((first, second) => first - second);
+  if (forms.length === 0) forms.push(1);
+  const formNumber = forms.includes(selectedForm) ? selectedForm : forms[0];
+  const prefix = `snap_iv_form_${formNumber}`;
+  const respondentLabels: Record<string, string> = {
+    self: "Autorelato",
+    mother: "Mãe",
+    father: "Pai",
+    teacher: "Professor",
+  };
+  const respondentValue = String(answers[`${prefix}_respondent`] ?? "");
+  const respondent = (respondentLabels[respondentValue] ?? respondentValue) || `Formulário ${formNumber}`;
+  const rows = snapIvResultDomains.map((domain) => {
+    const scoreValue = result[`${prefix}_${domain.key}_score`] ?? (formNumber === 1 ? result[`${domain.key}_score`] : undefined);
+    const numericScore = Number(scoreValue);
+    const classification = result[`${prefix}_${domain.key}_classification`] ?? (formNumber === 1 ? result[`${domain.key}_classification`] : undefined);
+    const classificationLabel = typeof classification === "string" && classification.trim()
+      ? classification
+      : scoreValue !== undefined && Number.isFinite(numericScore)
+        ? snapIvClassification(numericScore, domain.key === "opposition_defiance")
+        : "Sem classificação";
+    const normalizedClassification = classificationLabel.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const classificationLevel = normalizedClassification.includes("nao significativo") ? "none"
+      : normalizedClassification.includes("leve") ? "mild"
+        : normalizedClassification.includes("moderado") ? "moderate"
+          : normalizedClassification.includes("grave") ? "severe" : "unknown";
+    return {
+      ...domain,
+      score: scoreValue === undefined || !Number.isFinite(numericScore) ? null : numericScore,
+      classificationLabel,
+      classificationLevel,
+    };
+  });
+
+  return (
+    <div className="snapiv-results">
+      {forms.length > 1 && (
+        <div className="tab-list snapiv-results-tabs" role="tablist" aria-label="Resultados por formulário">
+          {forms.map((number) => (
+            <button
+              key={number}
+              type="button"
+              role="tab"
+              aria-selected={formNumber === number}
+              className={formNumber === number ? "active" : ""}
+              onClick={() => setSelectedForm(number)}
+            >
+              Formulário {number}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="asrs-result-view-toggle" role="group" aria-label="Visualização dos resultados">
+        <button className={view === "table" ? "active" : ""} type="button" onClick={() => setView("table")}>☷ Tabela</button>
+        <button className={view === "chart" ? "active" : ""} type="button" onClick={() => setView("chart")}>▦ Gráfico</button>
+      </div>
+      {view === "table" ? (
+        <div className="snapiv-results-table result-table-wrap">
+          <table className="result-table">
+            <thead><tr><th>Itens</th><th>Pontuação</th><th>Classificação</th></tr></thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.key}>
+                  <td>{row.label}</td>
+                  <td>{row.score ?? "—"}</td>
+                  <td>{row.classificationLabel}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="snapiv-results-chart" role="img" aria-label={`Gráfico das pontuações do SNAP-IV para ${respondent}`}>
+          <h3>SNAP-IV ({respondent})</h3>
+          <div className="snapiv-chart-legend" aria-hidden="true">
+            <span><i className="snapiv-chart-key none" /> Sintomas Não Significativos</span>
+            <span><i className="snapiv-chart-key mild" /> Sintomas Leves</span>
+            <span><i className="snapiv-chart-key moderate" /> Sintomas Moderados</span>
+            <span><i className="snapiv-chart-key severe" /> Sintomas Graves</span>
+          </div>
+          <div className="snapiv-chart-body">
+            <div className="snapiv-chart-axis" aria-hidden="true">
+              {Array.from({ length: 28 }, (_, index) => 27 - index).map((tick) => <span key={tick}>{tick}</span>)}
+            </div>
+            <div className="snapiv-chart-bars">
+              {rows.map((row) => (
+                <div className="snapiv-chart-column" key={row.key}>
+                  <div className="snapiv-chart-bar-area">
+                    {row.score !== null && (
+                      <div
+                        className={`snapiv-chart-bar ${row.classificationLevel}`}
+                        style={{ height: `${Math.max(0, Math.min(row.score, 27)) / 27 * 100}%` }}
+                      >
+                        <strong>{row.score}</strong>
+                      </div>
+                    )}
+                  </div>
+                  <strong>{row.label}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      <p className="snapiv-results-caption">
+        {snapIvResultDomains.map((domain) => <span key={domain.key}><strong>{domain.label}:</strong> {domain.description}</span>)}
+      </p>
+      <p className="snapiv-results-source">
+        Classificação por faixas sugeridas no <a href="https://capp.ucsf.edu/sites/g/files/tkssra5836/f/SNAP-IV-26-item-Teacher-and-Parent-rating-scale.pdf" target="_blank" rel="noreferrer">guia de pontuação SNAP-IV 26 itens</a>.
+      </p>
+      <div className="snapiv-results-interpretation">
+        <label htmlFor="snapiv-result-summary">Interpretação dos Resultados</label>
+        <textarea
+          id="snapiv-result-summary"
+          disabled={disabled}
+          value={summary}
+          onChange={(event) => onSummaryChange(event.target.value)}
+          placeholder="Apresente a interpretação dos resultados da avaliação, articulando os dados obtidos e as observações clínicas."
+          rows={10}
+        />
+        <button type="button" disabled={disabled} onClick={onSave}>Salvar</button>
+      </div>
+    </div>
   );
 }
 
@@ -817,6 +1054,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [applicationTab, setApplicationTab] = useState<
     "test" | "results" | "details"
   >("test");
+  const [snapIvFormTab, setSnapIvFormTab] = useState(1);
+  const [snapIvFormCount, setSnapIvFormCount] = useState(1);
+  const [scaredPFormTab, setScaredPFormTab] = useState(1);
+  const [scaredPFormCount, setScaredPFormCount] = useState(1);
   const [asrsResultView, setAsrsResultView] = useState<"table" | "chart">(
     "table",
   );
@@ -848,7 +1089,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     return () => window.clearTimeout(timeout);
   }, [message]);
   const platformInstruments = instruments.filter(
-    (instrument) => instrument.versions[0]?.sourceMetadata?.platform,
+    (instrument) => !["SNAP-IV", "SCARED-C", "SCARED-P"].includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
   );
   const selectedPlatformInstrument = platformInstruments.find(
     (instrument) => instrument.code === platformTestCode,
@@ -1292,12 +1533,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setSelectedEvaluation(evaluation);
     setApplication({
       ...created,
-      instrumentVersion: {
+      instrumentVersion: created.instrumentVersion?.formSchema
+        ? created.instrumentVersion
+        : {
         ...version,
         instrument: { name: instrument.name },
-      },
+        },
     });
     setAnswers(created.answers ?? {});
+    setSnapIvFormCount(1);
+    setSnapIvFormTab(1);
+    setScaredPFormCount(1);
+    setScaredPFormTab(1);
     setSummary(created.professionalSummary ?? "");
     setApplicationTab("test");
     await loadReports(evaluation.id);
@@ -1317,6 +1564,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       );
       setApplication(loaded);
       setAnswers(loaded.answers ?? {});
+      setSnapIvFormCount(savedSnapIvFormCount(loaded.answers ?? {}));
+      setSnapIvFormTab(1);
+      setScaredPFormCount(savedScaredPFormCount(loaded.answers ?? {}));
+      setScaredPFormTab(1);
       setSummary(loaded.professionalSummary ?? "");
       setApplicationTab("test");
       if (loaded.evaluation?.id) {
@@ -1470,6 +1721,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     );
     setMessage("Resultado revisado.");
   }
+  async function saveSummary() {
+    if (!application) return;
+    await request(`/evaluations/applications/${application.id}/summary`, {
+      method: "PATCH",
+      body: JSON.stringify({ summary }),
+    });
+    setMessage("Interpretação salva.");
+  }
   async function lock() {
     if (!application) return;
     mergeApplicationUpdate(
@@ -1587,6 +1846,23 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setMobileMenu(false);
     routerNavigate(routes[nextView]);
   };
+  const snapIvAvailableFormCount = Math.max(
+    1,
+    ...(application?.instrumentVersion.formSchema.sections ?? [])
+      .map((section) => section.id.match(/^snap_iv_form_(\d+)_/)?.[1])
+      .filter((formNumber): formNumber is string => Boolean(formNumber))
+      .map(Number),
+  );
+  const scaredPAvailableFormCount = Math.max(
+    1,
+    ...(application?.instrumentVersion.formSchema.sections ?? [])
+      .map((section) => section.id.match(/^scared_p_form_(\d+)_/)?.[1])
+      .filter((formNumber): formNumber is string => Boolean(formNumber))
+      .map(Number),
+  );
+  const hasTabbedScaredP = application?.instrumentVersion.instrument.name === "SCARED-P" &&
+    application.instrumentVersion.formSchema.sections.some((section) => section.id.startsWith("scared_p_form_"));
+  const scaredPCurrentFormEnabled = answers[`scared_p_form_${scaredPFormTab}_enabled`] !== false;
   return (
     <main className="dashboard-shell">
       <aside className={`sidebar ${mobileMenu ? "is-open" : ""}`}>
@@ -1998,10 +2274,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </p>
               </div>
               <span className="platform-tests-count">
-                {platformInstruments.length} teste{platformInstruments.length === 1 ? "" : "s"}
+                {platformInstruments.length + 3} teste{platformInstruments.length + 3 === 1 ? "" : "s"}
               </span>
             </div>
             <div className="platform-tests-grid">
+              <SnapIvCard onOpen={() => routerNavigate("/testes-da-plataforma/snap-iv")} />
+              <ScaredCCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-c")} />
+              <ScaredPCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-p")} />
               {platformInstruments.map((instrument) => {
                 const metadata = instrument.versions[0]?.sourceMetadata?.platform;
                 if (!metadata) return null;
@@ -2032,6 +2311,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               })}
             </div>
           </section>
+        )}
+        {view === "platformTest" && platformTestCode === "SNAP-IV" && (
+          <SnapIvPage onBack={() => navigate("platformTests")} />
+        )}
+        {view === "platformTest" && platformTestCode === "SCARED-C" && (
+          <ScaredCPage onBack={() => navigate("platformTests")} />
+        )}
+        {view === "platformTest" && platformTestCode === "SCARED-P" && (
+          <ScaredPPage onBack={() => navigate("platformTests")} />
         )}
         {view === "platformTest" && selectedPlatformInstrument && selectedPlatformMetadata && (
           <section className="platform-test-page">
@@ -2114,7 +2402,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </section>
         )}
-        {view === "platformTest" && !selectedPlatformInstrument && !loading && (
+        {view === "platformTest" && !["SNAP-IV", "SCARED-C", "SCARED-P"].includes(platformTestCode ?? "") && !selectedPlatformInstrument && !loading && (
           <section className="panel empty-view">
             <h2>Teste não encontrado</h2>
             <button onClick={() => navigate("platformTests")}>Ver testes da plataforma</button>
@@ -2466,13 +2754,100 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </div>
             {applicationTab === "test" && (
               <>
-                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : ""}`}>
+                {application.instrumentVersion.instrument.name === "SNAP-IV" && application.instrumentVersion.formSchema.sections.some((section) => section.id.startsWith("snap_iv_form_")) && (
+                  <div className="tab-list snapiv-form-tabs" role="tablist" aria-label="Formulários SNAP-IV">
+                    {Array.from({ length: snapIvFormCount }, (_, index) => index + 1).map((formNumber) => (
+                      <button
+                        className={snapIvFormTab === formNumber ? "active" : ""}
+                        key={formNumber}
+                        type="button"
+                        role="tab"
+                        aria-selected={snapIvFormTab === formNumber}
+                        onClick={() => setSnapIvFormTab(formNumber)}
+                      >
+                        Formulário {formNumber}
+                      </button>
+                    ))}
+                    {snapIvFormCount < snapIvAvailableFormCount && (
+                      <button
+                        type="button"
+                        aria-label="Adicionar formulário SNAP-IV"
+                        onClick={() => {
+                          const nextForm = snapIvFormCount + 1;
+                          setSnapIvFormCount(nextForm);
+                          setSnapIvFormTab(nextForm);
+                          setAnswers((current) => ({
+                            ...current,
+                            [`snap_iv_form_${nextForm}_enabled`]: true,
+                          }));
+                        }}
+                      >
+                        + Adicionar formulário
+                      </button>
+                    )}
+                  </div>
+                )}
+                {hasTabbedScaredP && (
+                  <>
+                  <div className="tab-list snapiv-form-tabs scared-form-tabs" role="tablist" aria-label="Formulários SCARED-P">
+                    {Array.from({ length: scaredPFormCount }, (_, index) => index + 1).map((formNumber) => (
+                      <button
+                        className={scaredPFormTab === formNumber ? "active" : ""}
+                        key={formNumber}
+                        type="button"
+                        role="tab"
+                        aria-selected={scaredPFormTab === formNumber}
+                        onClick={() => setScaredPFormTab(formNumber)}
+                      >
+                        Formulário {formNumber}
+                      </button>
+                    ))}
+                    {canEdit && scaredPFormCount < scaredPAvailableFormCount && (
+                      <button
+                        type="button"
+                        aria-label="Adicionar formulário SCARED-P"
+                        onClick={() => {
+                          const nextForm = scaredPFormCount + 1;
+                          setScaredPFormCount(nextForm);
+                          setScaredPFormTab(nextForm);
+                          setAnswers((current) => ({ ...current, [`scared_p_form_${nextForm}_enabled`]: true }));
+                        }}
+                      >
+                        + Adicionar formulário
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        className="scared-clear-form"
+                        type="button"
+                        onClick={() => setAnswers((current) => Object.fromEntries(Object.entries(current).filter(([fieldId]) => !fieldId.startsWith(`scared_p_form_${scaredPFormTab}_`) || fieldId.endsWith("_enabled"))))}
+                      >
+                        Limpar formulário
+                      </button>
+                    )}
+                  </div>
+                  <div className="scared-form-controls" role="group" aria-label="Preencher questões do formulário">
+                    <span>Preencher questões:</span>
+                    <button className={scaredPCurrentFormEnabled ? "active" : ""} type="button" disabled={!canEdit} onClick={() => setAnswers((current) => ({ ...current, [`scared_p_form_${scaredPFormTab}_enabled`]: true }))}>Sim</button>
+                    <button className={!scaredPCurrentFormEnabled ? "active" : ""} type="button" disabled={!canEdit} onClick={() => setAnswers((current) => ({
+                      ...Object.fromEntries(Object.entries(current).filter(([fieldId]) => !fieldId.startsWith(`scared_p_form_${scaredPFormTab}_item_`))),
+                      [`scared_p_form_${scaredPFormTab}_enabled`]: false,
+                    }))}>Não</button>
+                  </div>
+                  </>
+                )}
+                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : application.instrumentVersion.instrument.name === "SNAP-IV" ? "snapiv-form-sections" : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? "scared-form-sections" : ""}`}>
                   {application.instrumentVersion.formSchema.sections.map(
                     (section) => (
-                      <div key={section.id}>
+                      (application.instrumentVersion.instrument.name !== "SNAP-IV" || !application.instrumentVersion.formSchema.sections.some((item) => item.id.startsWith("snap_iv_form_")) || section.id.startsWith(`snap_iv_form_${snapIvFormTab}_`)) &&
+                      (!hasTabbedScaredP || (section.id.startsWith(`scared_p_form_${scaredPFormTab}_`) && (scaredPCurrentFormEnabled || !section.id.endsWith("_questions")))) && (
+                      <div
+                        key={section.id}
+                        className={section.id.includes("_respondent_section") ? "snapiv-respondent-section" : section.id === "parent_report_respondent" ? "scared-respondent-section" : undefined}
+                      >
                         <h3>{section.title}</h3>
-                        {section.fields[0]?.id.startsWith("asrs_") && (
-                          <div className="asrs-choice-header" aria-hidden="true">
+                        {(section.fields[0]?.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(section.fields[0]?.id ?? "") || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "")) && (
+                          <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "") ? "scared-choice-header" : section.fields[0]?.id.startsWith("snap_iv_") ? "snapiv-choice-header" : "asrs-choice-header"} aria-hidden="true">
                             <span>Questões</span>
                             {section.fields[0].options?.map((option) => (
                               <span key={option.value}>{option.label}</span>
@@ -2496,6 +2871,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                           </div>
                         ))}
                       </div>
+                      )
                     ),
                   )}
                 </div>
@@ -2540,7 +2916,56 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             {applicationTab === "results" &&
               (application.result ? (
                 <div className="result-area">
-                  {application.instrumentVersion.instrument.name === "ASRS-18" ? (
+                  {application.instrumentVersion.instrument.name === "SNAP-IV" ? (
+                    <SnapIvResults
+                      result={application.result}
+                      answers={answers}
+                      summary={summary}
+                      disabled={application.status === "LOCKED"}
+                      onSummaryChange={setSummary}
+                      onSave={() => void saveSummary()}
+                    />
+                  ) : hasTabbedScaredP ? (
+                    <ScaredPResults
+                      result={application.result}
+                      summary={summary}
+                      disabled={application.status === "LOCKED"}
+                      onSummaryChange={setSummary}
+                      onSave={() => void saveSummary()}
+                    />
+                  ) : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? (
+                    <>
+                      {application.instrumentVersion.instrument.name === "SCARED-P" && (
+                        <p>Respondente: {{ mother: "Mãe", father: "Pai", caregiver: "Cuidador(a)" }[String(application.result.scared_p_respondent ?? "")] ?? String(application.result.scared_p_respondent ?? "—")}</p>
+                      )}
+                      <div className="result result-table-wrap">
+                        <table className="result-table">
+                          <thead><tr><th>Indicador</th><th>Pontuação</th><th>Rastreamento</th></tr></thead>
+                          <tbody>
+                            {[
+                              ["Total", "total", 82, 25],
+                              ["Pânico/somático", "panic_somatic", 26, 7],
+                              ["Ansiedade generalizada", "generalized_anxiety", 18, 9],
+                              ["Separação", "separation_anxiety", 16, 5],
+                              ["Ansiedade social", "social_anxiety", 14, 8],
+                              ["Evitação escolar", "school_avoidance", 8, 3],
+                            ].map(([label, domain, maximum, cutoff]) => (
+                              <tr key={String(domain)}>
+                                <td>{label}</td>
+                                <td>{String(application.result?.[`${application.instrumentVersion.instrument.name === "SCARED-P" ? "scared_p" : "scared_c"}_${domain}${domain === "total" ? "" : "_score"}`] ?? "—")} / {maximum}</td>
+                                <td>{String(application.result?.[`${application.instrumentVersion.instrument.name === "SCARED-P" ? "scared_p" : "scared_c"}_${domain}_screen`] ?? "—")} (≥ {cutoff})</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p>Pontos de atenção da ficha original. Resultados de rastreamento não estabelecem diagnóstico; a tradução dos itens deve ser conferida com a versão adotada.</p>
+                      <label>Revise o resultado e escreva sua síntese
+                        <textarea disabled={application.status === "LOCKED"} value={summary} onChange={(event) => setSummary(event.target.value)} rows={5} />
+                      </label>
+                      <button className="secondary" disabled={application.status === "LOCKED"} onClick={() => void saveSummary()}>Salvar síntese</button>
+                    </>
+                  ) : application.instrumentVersion.instrument.name === "ASRS-18" ? (
                     <>
                       <div className="asrs-result-view-toggle" role="group" aria-label="Visualização dos resultados">
                         <button
@@ -2656,36 +3081,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </dl>
             )}
-            <div className="report-history" id="relatorios">
-              <div className="panel-heading">
-                <div>
-                  <span className="section-kicker">Documentos</span>
-                  <h3>Histórico de PDFs</h3>
-                </div>
-              </div>
-              {reports.length === 0 ? (
-                <p className="muted">Nenhum PDF gerado para esta avaliação.</p>
-              ) : (
-                <ul className="data-list">
-                  {reports.map((report) => (
-                    <li key={report.id}>
-                      <div>
-                        <strong>Revisão {report.revision}</strong>
-                        <span>
-                          {new Date(report.generatedAt).toLocaleString("pt-BR")}
-                        </span>
-                      </div>
-                      <button
-                        className="small"
-                        onClick={() => previewReport(report.id)}
-                      >
-                        Visualizar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
             </section>
           </>
         )}
