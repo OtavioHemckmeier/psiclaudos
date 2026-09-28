@@ -1,5 +1,7 @@
 # Arquitetura dos instrumentos
 
+Para adicionar um novo instrumento ou formulário, siga `AGENTS.md`, `CHECKLIST_INSTRUMENTOS.md` e a ficha em `docs/instruments/TEMPLATE.md` antes de liberar cálculos ou exportações.
+
 Cada instrumento tem um código estável (`ASRS-18`, `SNAP-IV`, `SCARED-C`, `SCARED-P`) e uma versão publicada. O formulário, as regras de pontuação, o resultado e a apresentação são dados dessa versão; a aplicação guarda as respostas e o resultado calculado.
 
 ## Onde alterar
