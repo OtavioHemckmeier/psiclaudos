@@ -11,6 +11,7 @@ import { AuditService } from "../audit.service";
 export type EvaluationInput = {
   patientId: string;
   title: string;
+  applicationDate?: string;
   requester?: string;
   purpose?: string;
   demandDescription?: string;
@@ -20,6 +21,13 @@ export type EvaluationInput = {
 };
 
 const normalizeText = (value?: string) => value?.trim() || undefined;
+const parseApplicationDate = (value?: string) => {
+  if (!value) return undefined;
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime()))
+    throw new ConflictException("Data de aplicação inválida.");
+  return date;
+};
 
 @Injectable()
 export class EvaluationsService {
@@ -42,7 +50,12 @@ export class EvaluationsService {
         : {}),
       ...(status ? { status } : {}),
     };
-    const include = { patient: true, applications: true };
+    const include = {
+      patient: true,
+      applications: {
+        include: { instrumentVersion: { include: { instrument: true } } },
+      },
+    };
     if (!page && !pageSize)
       return this.prisma.evaluation.findMany({
         where,
@@ -89,6 +102,7 @@ export class EvaluationsService {
             patientId: input.patientId,
             professionalId: user.id,
             title: input.title.trim(),
+            applicationDate: parseApplicationDate(input.applicationDate),
             requester: normalizeText(input.requester),
             purpose: normalizeText(input.purpose),
             demandDescription: normalizeText(input.demandDescription),
@@ -133,6 +147,9 @@ export class EvaluationsService {
         where: { id: evaluation.id },
         data: {
           ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+          ...(input.applicationDate !== undefined
+            ? { applicationDate: parseApplicationDate(input.applicationDate) }
+            : {}),
           ...(input.requester !== undefined
             ? { requester: normalizeText(input.requester) }
             : {}),
@@ -197,6 +214,7 @@ export class EvaluationsService {
         },
       })
       .then(async (application) => {
+        await this.syncStatus(evaluation.id);
         await this.audit.record(
           user,
           "INSTRUMENT_STARTED",
@@ -227,12 +245,38 @@ export class EvaluationsService {
     const application = await this.getApplication(user, id);
     if (["LOCKED", "REVIEWED"].includes(application.status))
       throw new Error("A aplicação está bloqueada para edição.");
-    return this.prisma.instrumentApplication.update({
+    const updated = await this.prisma.instrumentApplication.update({
       where: { id: application.id },
       data: {
         answers: answers as Prisma.InputJsonValue,
         status: "IN_PROGRESS",
       },
     });
+    await this.syncStatus(application.evaluationId);
+    return updated;
+  }
+
+  async syncStatus(evaluationId: string) {
+    const evaluation = await this.prisma.evaluation.findUnique({
+      where: { id: evaluationId },
+      select: { applications: { select: { status: true } } },
+    });
+    if (!evaluation) return;
+    const statuses = evaluation.applications.map((application) => application.status);
+    const status =
+      statuses.length === 0
+        ? "DRAFT"
+        : statuses.every((current) => current === "LOCKED")
+          ? "COMPLETED"
+          : statuses.some((current) =>
+                ["NOT_STARTED", "IN_PROGRESS", "REOPENED"].includes(current),
+              )
+            ? "IN_PROGRESS"
+            : statuses.some((current) => current === "CALCULATED")
+              ? "CALCULATED"
+              : statuses.some((current) => current === "REVIEWED")
+                ? "REVIEWED"
+                : "DRAFT";
+    await this.prisma.evaluation.update({ where: { id: evaluationId }, data: { status } });
   }
 }

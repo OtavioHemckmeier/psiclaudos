@@ -17,6 +17,10 @@ type PresentationSchema = {
   tables?: Array<{ title?: string; columns: PresentationField[] }>;
   charts?: Array<{ title?: string; type: "BAR"; fields: PresentationField[] }>;
 };
+type ReportExportOptions = {
+  chapters?: Partial<Record<"coverPage" | "identification" | "demand" | "procedures" | "anamnesis" | "conclusion" | "referral" | "references" | "deliveryTerm", boolean>>;
+  tests?: Record<string, { table?: boolean; chart?: boolean }>;
+};
 
 @Injectable()
 export class ReportsService {
@@ -25,7 +29,7 @@ export class ReportsService {
     private readonly audit: AuditService,
   ) {}
 
-  async generate(user: AuthUser, evaluationId: string) {
+  async generate(user: AuthUser, evaluationId: string, inputOptions?: ReportExportOptions) {
     const evaluation = await this.prisma.evaluation.findFirst({
       where: { id: evaluationId, organizationId: user.organizationId },
       include: {
@@ -43,6 +47,26 @@ export class ReportsService {
       throw new NotFoundException(
         "A avaliação ainda não possui resultados calculados.",
       );
+    const exportOptions = {
+      chapters: {
+        coverPage: false,
+        identification: true,
+        demand: true,
+        procedures: true,
+        anamnesis: true,
+        conclusion: true,
+        referral: true,
+        references: true,
+        deliveryTerm: true,
+        ...inputOptions?.chapters,
+      },
+      tests: Object.fromEntries(
+        applications.map((application) => [
+          application.id,
+          { table: true, chart: true, ...inputOptions?.tests?.[application.id] },
+        ]),
+      ),
+    };
     const professional = await this.prisma.user.findFirst({
       where: { id: user.id, organizationId: user.organizationId },
       select: {
@@ -66,6 +90,7 @@ export class ReportsService {
       patient: evaluation.patient,
       applications,
       professional,
+      exportOptions,
       generatedBy: user.id,
     };
     const buffer = await this.renderPdf(snapshot);
@@ -160,7 +185,7 @@ export class ReportsService {
   }
 
   private renderPdf(snapshot: {
-    evaluation: {
+      evaluation: {
       title: string;
       requester: string | null;
       purpose: string | null;
@@ -171,6 +196,7 @@ export class ReportsService {
     };
     patient: { name: string; birthDate: Date | null };
     applications: Array<{
+      id: string;
       instrumentVersion: {
         version: string;
         instrument: { name: string };
@@ -179,7 +205,7 @@ export class ReportsService {
       result: unknown;
       professionalSummary: string | null;
     }>;
-    professional: {
+      professional: {
       name: string;
       professionalRegistration: string | null;
       signatureText: string | null;
@@ -188,72 +214,54 @@ export class ReportsService {
         email: string | null;
         phone: string | null;
       } | null;
-    } | null;
+      } | null;
+    exportOptions: {
+      chapters: Record<string, boolean>;
+      tests: Record<string, { table: boolean; chart: boolean }>;
+    };
   }): Promise<Buffer> {
     return new Promise((resolve) => {
       const document = new PDFDocument({ margin: 50 });
       const chunks: Buffer[] = [];
       document.on("data", (chunk) => chunks.push(chunk));
       document.on("end", () => resolve(Buffer.concat(chunks)));
-      document
-        .fontSize(20)
-        .text(snapshot.evaluation.title || "Relatório de resultados", {
-          align: "center",
-        });
+      if (snapshot.exportOptions.chapters.coverPage) {
+        document
+          .moveDown(8)
+          .fontSize(22)
+          .text(snapshot.evaluation.title || "Laudo psicológico", { align: "center" })
+          .moveDown()
+          .fontSize(13)
+          .text(snapshot.patient.name, { align: "center" });
+        document.addPage();
+      }
+      document.fontSize(20).text(snapshot.evaluation.title || "Relatório de resultados", { align: "center" });
       if (snapshot.professional?.organization?.name)
         document
           .moveDown(0.2)
           .fontSize(10)
           .fillColor("#555")
           .text(snapshot.professional.organization.name, { align: "center" });
-      document
-        .moveDown()
-        .fontSize(12)
-        .text(`Paciente: ${snapshot.patient.name}`);
-      if (snapshot.professional)
-        document.text(
-          `Profissional: ${snapshot.professional.name}${snapshot.professional.professionalRegistration ? ` · ${snapshot.professional.professionalRegistration}` : ""}`,
-        );
-      if (snapshot.patient.birthDate)
-        document.text(
-          `Data de nascimento: ${snapshot.patient.birthDate.toLocaleDateString("pt-BR")}`,
-        );
-      this.renderTextSection(
-        document,
-        "Solicitante",
-        snapshot.evaluation.requester,
-      );
-      this.renderTextSection(
-        document,
-        "Finalidade",
-        snapshot.evaluation.purpose,
-      );
-      this.renderTextSection(
-        document,
-        "Descrição da demanda",
-        snapshot.evaluation.demandDescription,
-      );
+      if (snapshot.exportOptions.chapters.identification) {
+        document.moveDown().fontSize(12).text(`Paciente: ${snapshot.patient.name}`);
+        if (snapshot.professional)
+          document.text(`Profissional: ${snapshot.professional.name}${snapshot.professional.professionalRegistration ? ` · ${snapshot.professional.professionalRegistration}` : ""}`);
+        if (snapshot.patient.birthDate)
+          document.text(`Data de nascimento: ${snapshot.patient.birthDate.toLocaleDateString("pt-BR")}`);
+        this.renderTextSection(document, "Solicitante", snapshot.evaluation.requester);
+        this.renderTextSection(document, "Finalidade", snapshot.evaluation.purpose);
+      }
+      if (snapshot.exportOptions.chapters.demand)
+        this.renderTextSection(document, "Descrição da demanda", snapshot.evaluation.demandDescription);
+      if (snapshot.exportOptions.chapters.procedures)
+        this.renderTextSection(document, "Procedimentos", snapshot.applications.map((application) => application.instrumentVersion.instrument.name).join("\n"));
       const anamnesis = this.asRecord(snapshot.evaluation.anamnesis);
-      this.renderTextSection(
-        document,
-        "História pessoal e desenvolvimento",
-        this.displayValue(anamnesis.personalHistory),
-      );
-      this.renderTextSection(
-        document,
-        "Contexto familiar e relacional",
-        this.displayValue(anamnesis.familyContext),
-      );
-      this.renderTextSection(
-        document,
-        "Histórico médico e psiquiátrico",
-        this.displayValue(anamnesis.medicalHistory),
-      );
-      this.renderTextSection(
-        document,
-        "Fatores psicossociais e ambientais",
-        this.displayValue(anamnesis.psychosocialFactors),
-      );
+      if (snapshot.exportOptions.chapters.anamnesis) {
+        this.renderTextSection(document, "História pessoal e desenvolvimento", this.displayValue(anamnesis.personalHistory));
+        this.renderTextSection(document, "Contexto familiar e relacional", this.displayValue(anamnesis.familyContext));
+        this.renderTextSection(document, "Histórico médico e psiquiátrico", this.displayValue(anamnesis.medicalHistory));
+        this.renderTextSection(document, "Fatores psicossociais e ambientais", this.displayValue(anamnesis.psychosocialFactors));
+      }
       document.moveDown();
       for (const application of snapshot.applications) {
         document
@@ -273,38 +281,31 @@ export class ReportsService {
                 columns: Object.keys(result).map((id) => ({ id })),
               },
             ];
-        for (const table of tables) this.renderTable(document, table, result);
-        for (const chart of presentation.charts ?? [])
-          this.renderBarChart(document, chart, result);
+        const testOptions = snapshot.exportOptions.tests[application.id] ?? { table: true, chart: true };
+        if (testOptions.table)
+          for (const table of tables) this.renderTable(document, table, result);
+        if (testOptions.chart)
+          for (const chart of presentation.charts ?? []) this.renderBarChart(document, chart, result);
         if (application.professionalSummary)
           document
             .moveDown()
             .text(`Síntese revisada: ${application.professionalSummary}`);
         document.moveDown();
       }
-      this.renderTextSection(
-        document,
-        "Conclusão",
-        snapshot.evaluation.conclusion,
-      );
-      this.renderTextSection(
-        document,
-        "Encaminhamento",
-        snapshot.evaluation.referral,
-      );
+      if (snapshot.exportOptions.chapters.conclusion)
+        this.renderTextSection(document, "Conclusão", snapshot.evaluation.conclusion);
+      if (snapshot.exportOptions.chapters.referral)
+        this.renderTextSection(document, "Encaminhamento", snapshot.evaluation.referral);
+      if (snapshot.exportOptions.chapters.references)
+        this.renderTextSection(document, "Referências bibliográficas", "Kessler, R. C. et al. The World Health Organization Adult ADHD Self-Report Scale (ASRS). Psychological Medicine, 2005.");
       if (snapshot.professional?.signatureText)
         document
           .moveDown(2)
           .fontSize(10)
           .fillColor("#111")
           .text(snapshot.professional.signatureText, { align: "center" });
-      document
-        .moveDown()
-        .fontSize(9)
-        .fillColor("#555")
-        .text(
-          "Documento de apoio à correção e análise profissional. Não constitui diagnóstico automático.",
-        );
+      if (snapshot.exportOptions.chapters.deliveryTerm)
+        document.moveDown().fontSize(9).fillColor("#555").text("Documento de apoio à correção e análise profissional. Não constitui diagnóstico automático.");
       document.end();
     });
   }

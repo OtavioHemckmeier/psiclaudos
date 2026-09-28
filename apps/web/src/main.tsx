@@ -109,10 +109,11 @@ type Evaluation = {
   title: string;
   status: string;
   createdAt: string;
+  applicationDate?: string | null;
   applications?: Array<{
     id: string;
     status: string;
-    instrumentVersion?: { version: string; instrument: { name: string } };
+    instrumentVersion?: { id: string; version: string; instrument: { name: string } };
   }>;
   requester?: string | null;
   purpose?: string | null;
@@ -131,14 +132,31 @@ type Field = {
 };
 type Instrument = {
   id: string;
+  code: string;
   name: string;
+  description?: string | null;
+  category?: string | null;
   versions: Array<{
     id: string;
     version: string;
+    sourceMetadata?: {
+      platform?: PlatformInstrumentMetadata;
+    } | null;
     formSchema: {
       sections: Array<{ id: string; title: string; fields: Field[] }>;
     };
   }>;
+};
+type PlatformInstrumentMetadata = {
+  subtitle: string;
+  audience: string;
+  authors: string;
+  itemCount: number;
+  format: string;
+  purpose: string;
+  domains: string[];
+  professionalUse: string;
+  applicationEnabled: boolean;
 };
 type Application = {
   id: string;
@@ -146,11 +164,16 @@ type Application = {
   answers?: Record<string, unknown>;
   result?: Record<string, unknown>;
   professionalSummary?: string | null;
+  evaluation?: { id: string };
   instrumentVersion: Instrument["versions"][number] & {
     instrument: { name: string };
   };
 };
 type Report = { id: string; revision: number; generatedAt: string };
+type ReportExportSettings = {
+  chapters: Record<string, boolean>;
+  tests: Record<string, { table: boolean; chart: boolean }>;
+};
 type Profile = {
   id: string;
   name: string;
@@ -187,11 +210,16 @@ type WorkspaceView =
   | "reports"
   | "editor"
   | "results"
+  | "platformTests"
+  | "platformTest"
   | "profile"
   | "settings";
 
 const viewFromPathname = (pathname: string): WorkspaceView => {
-  if (/^\/pacientes\/[^/]+\/editar$/.test(pathname)) return "patientEdit";
+  if (/^\/testes-da-plataforma\/[^/]+$/.test(pathname)) return "platformTest";
+  if (/^\/laudos\/[^/]+$/.test(pathname)) return "editor";
+  if (/^\/resultados\/[^/]+$/.test(pathname)) return "results";
+  if (/^\/pacientes\/editar\/[^/]+$/.test(pathname)) return "patientEdit";
   if (/^\/pacientes\/[^/]+$/.test(pathname)) return "patient";
   switch (pathname) {
     case "/pacientes":
@@ -200,8 +228,8 @@ const viewFromPathname = (pathname: string): WorkspaceView => {
       return "reports";
     case "/resultados":
       return "results";
-    case "/editor":
-      return "editor";
+    case "/testes-da-plataforma":
+      return "platformTests";
     case "/perfil":
       return "profile";
     case "/configuracoes":
@@ -241,6 +269,14 @@ const viewDetails: Record<WorkspaceView, { title: string; subtitle: string }> =
       title: "Resultados",
       subtitle: "Preencha, revise e bloqueie a aplicação atual.",
     },
+    platformTests: {
+      title: "Testes da Plataforma",
+      subtitle: "Conheça os instrumentos disponíveis para as avaliações.",
+    },
+    platformTest: {
+      title: "ASRS-18",
+      subtitle: "Informações técnicas e critérios de utilização do instrumento.",
+    },
     profile: {
       title: "Perfil profissional",
       subtitle: "Mantenha seus dados profissionais atualizados.",
@@ -250,6 +286,24 @@ const viewDetails: Record<WorkspaceView, { title: string; subtitle: string }> =
       subtitle: "Gerencie as opções disponíveis para a organização.",
     },
   };
+
+const statusLabel = (status?: string) =>
+  ({
+    DRAFT: "Rascunho",
+    COMPLETED: "Concluída",
+    NOT_STARTED: "Não iniciada",
+    IN_PROGRESS: "Em andamento",
+    REOPENED: "Reaberta",
+    CALCULATED: "Calculada",
+    REVIEWED: "Revisada",
+    LOCKED: "Bloqueada",
+    ACTIVE: "Ativo",
+    ARCHIVED: "Arquivado",
+    PUBLISHED: "Publicada",
+  })[status ?? ""] ?? status ?? "—";
+
+const statusClassName = (status?: string) =>
+  `status status-${(status ?? "draft").toLowerCase().replaceAll("_", "-")}`;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const accessToken = localStorage.getItem("laudo_token");
@@ -358,6 +412,25 @@ function InstrumentFieldControl({
     field.type === "SINGLE_CHOICE" ||
     (field.type === "SCALE" && field.options?.length)
   ) {
+    if (field.id.startsWith("asrs_")) {
+      return (
+        <div className="asrs-choice-list">
+          {field.options?.map((option) => (
+            <label key={option.value} title={option.label}>
+              <input
+                disabled={disabled}
+                type="radio"
+                name={field.id}
+                aria-label={option.label}
+                checked={value === option.value}
+                onChange={() => onChange(option.value)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      );
+    }
     return (
       <select
         disabled={disabled}
@@ -624,10 +697,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const routerNavigate = useNavigate();
   const view = viewFromPathname(location.pathname);
   const patientRouteId =
-    view === "patient" || view === "patientEdit"
+    view === "patient"
       ? location.pathname.split("/")[2]
-      : null;
+      : view === "patientEdit"
+        ? location.pathname.split("/")[3]
+        : null;
+  const reportRouteId =
+    view === "editor" ? location.pathname.split("/")[2] : null;
+  const resultRouteId =
+    view === "results" ? location.pathname.split("/")[2] : null;
   const isPatientEditPage = view === "patientEdit";
+  const platformTestCode =
+    view === "platformTest" ? location.pathname.split("/")[2]?.toUpperCase() : null;
   const [patients, setPatients] = useState<Patient[]>([]);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [instruments, setInstruments] = useState<Instrument[]>([]);
@@ -637,6 +718,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [patientFormError, setPatientFormError] = useState("");
   const [savingPatient, setSavingPatient] = useState(false);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+  const [archivePatientId, setArchivePatientId] = useState<string | null>(null);
   const [patientDetailsTab, setPatientDetailsTab] = useState<
     "data" | "address" | "reports" | "notes"
   >("data");
@@ -652,6 +734,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [title, setTitle] = useState("");
   const [reportFormOpen, setReportFormOpen] = useState(false);
   const [patientId, setPatientId] = useState("");
+  const [quickPatientName, setQuickPatientName] = useState("");
+  const [quickPatientBirthDate, setQuickPatientBirthDate] = useState("");
+  const [applicationDate, setApplicationDate] = useState("");
+  const [selectedInstrumentVersionIds, setSelectedInstrumentVersionIds] =
+    useState<string[]>([]);
   const [evaluationSearch, setEvaluationSearch] = useState("");
   const [evaluationStatus, setEvaluationStatus] = useState("");
   const [selectedEvaluation, setSelectedEvaluation] =
@@ -676,9 +763,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [applicationTab, setApplicationTab] = useState<
     "test" | "results" | "details"
   >("test");
+  const [asrsResultView, setAsrsResultView] = useState<"table" | "chart">(
+    "table",
+  );
   const [instrumentPickerOpen, setInstrumentPickerOpen] = useState(false);
   const [instrumentVersionId, setInstrumentVersionId] = useState("");
   const [reports, setReports] = useState<Report[]>([]);
+  const [reportExportOpen, setReportExportOpen] = useState(false);
+  const [reportExportSettings, setReportExportSettings] =
+    useState<ReportExportSettings>({ chapters: {}, tests: {} });
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [summary, setSummary] = useState("");
   const [message, setMessage] = useState("");
@@ -693,6 +786,31 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [activity, setActivity] = useState<AuditEvent[]>([]);
+  useEffect(() => {
+    if (!message) return;
+    const timeout = window.setTimeout(() => setMessage(""), 5_000);
+    return () => window.clearTimeout(timeout);
+  }, [message]);
+  const platformInstruments = instruments.filter(
+    (instrument) => instrument.versions[0]?.sourceMetadata?.platform,
+  );
+  const selectedPlatformInstrument = platformInstruments.find(
+    (instrument) => instrument.code === platformTestCode,
+  );
+  const selectedPlatformMetadata =
+    selectedPlatformInstrument?.versions[0]?.sourceMetadata?.platform;
+  const availableInstrumentVersions = instruments.flatMap((instrument) =>
+    instrument.versions
+      .filter(
+        (version) =>
+          Boolean(version.sourceMetadata?.platform),
+      )
+      .map((version) => ({
+        id: version.id,
+        label: `${instrument.name} · versão ${version.version}`,
+        enabled: version.sourceMetadata?.platform?.applicationEnabled === true,
+      })),
+  );
   async function load(
     filters = {
       patient: patientSearch,
@@ -735,6 +853,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (view === "reports") void load();
+  }, [view]);
   useEffect(() => {
     if (!patientRouteId) {
       setDetails(null);
@@ -779,6 +900,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       active = false;
     };
   }, [patientRouteId, view]);
+  useEffect(() => {
+    if (!reportRouteId || selectedEvaluation?.id === reportRouteId) return;
+    void openReport(reportRouteId, false);
+  }, [reportRouteId, selectedEvaluation?.id]);
+  useEffect(() => {
+    if (!resultRouteId || application?.id === resultRouteId) return;
+    void openApplication(resultRouteId, false);
+  }, [resultRouteId, application?.id]);
   async function createFullPatient(event: FormEvent) {
     event.preventDefault();
     setPatientFormError("");
@@ -837,23 +966,63 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         : emptyPatientForm(),
     );
     if (patient) {
-      routerNavigate(`/pacientes/${patient.id}/editar`);
+      routerNavigate(`/pacientes/editar/${patient.id}`);
       window.scrollTo(0, 0);
     }
     setPatientFormOpen(true);
   };
   async function createEvaluation(event: FormEvent) {
     event.preventDefault();
-    if (!patientId) return;
     try {
-      await request("/evaluations", {
+      if (!applicationDate) {
+        setMessage("Informe a data de aplicação do teste.");
+        return;
+      }
+      let selectedPatientId = patientId;
+      let selectedPatientName = patients.find(
+        (patient) => patient.id === patientId,
+      )?.name;
+      if (!selectedPatientId) {
+        if (!quickPatientName.trim() || !quickPatientBirthDate) {
+          setMessage("Selecione um paciente ou informe nome e data de nascimento.");
+          return;
+        }
+        const patient = await request<Patient>("/patients", {
+          method: "POST",
+          body: JSON.stringify({
+            name: quickPatientName.trim(),
+            birthDate: quickPatientBirthDate,
+          }),
+        });
+        selectedPatientId = patient.id;
+        selectedPatientName = patient.name;
+      }
+      const evaluation = await request<Evaluation>("/evaluations", {
         method: "POST",
-        body: JSON.stringify({ patientId, title }),
+        body: JSON.stringify({
+          patientId: selectedPatientId,
+          title: title.trim() || `Avaliação de ${selectedPatientName ?? "paciente"}`,
+          applicationDate: applicationDate || undefined,
+        }),
       });
+      await Promise.all(
+        selectedInstrumentVersionIds.map((instrumentVersionId) =>
+          request(`/evaluations/${evaluation.id}/applications`, {
+            method: "POST",
+            body: JSON.stringify({ instrumentVersionId }),
+          }),
+        ),
+      );
       setTitle("");
+      setPatientId("");
+      setQuickPatientName("");
+      setQuickPatientBirthDate("");
+      setApplicationDate("");
+      setSelectedInstrumentVersionIds([]);
       setReportFormOpen(false);
       setMessage("Avaliação criada.");
       await load();
+      await openReport(evaluation.id);
       if (patientRouteId)
         setDetails(await request<PatientDetails>(`/patients/${patientRouteId}/details`));
     } catch (err) {
@@ -915,15 +1084,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       );
     }
   }
-  async function archivePatient(id: string) {
-    if (
-      !window.confirm(
-        "Deseja arquivar este paciente? O histórico será preservado e o cadastro deixará de aparecer nas listas.",
-      )
-    )
-      return;
+  async function archivePatient() {
+    if (!archivePatientId) return;
+    const id = archivePatientId;
     try {
       await request(`/patients/${id}`, { method: "DELETE" });
+      setArchivePatientId(null);
       setDetails(null);
       setMessage("Paciente arquivado.");
       await load();
@@ -939,6 +1105,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const createReportForPatient = (patient: Patient) => {
     setPatientId(patient.id);
     setTitle("");
+    setQuickPatientName("");
+    setQuickPatientBirthDate("");
+    setApplicationDate("");
+    setSelectedInstrumentVersionIds([]);
+    setReportFormOpen(true);
+  };
+  const openReportForm = () => {
+    setPatientId("");
+    setTitle("");
+    setQuickPatientName("");
+    setQuickPatientBirthDate("");
+    setApplicationDate("");
+    setSelectedInstrumentVersionIds([]);
     setReportFormOpen(true);
   };
   async function saveProfile(event: FormEvent) {
@@ -1068,14 +1247,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     await loadReports(evaluation.id);
     setInstrumentPickerOpen(false);
     setInstrumentVersionId("");
-    routerNavigate("/resultados");
+    routerNavigate(`/resultados/${created.id}`);
   }
   const openInstrumentPicker = (evaluation: Evaluation) => {
     setSelectedEvaluation(evaluation);
     setInstrumentVersionId("");
     setInstrumentPickerOpen(true);
   };
-  async function openApplication(applicationId: string) {
+  async function openApplication(applicationId: string, navigateToResult = true) {
     try {
       const loaded = await request<Application>(
         `/evaluations/applications/${applicationId}`,
@@ -1084,7 +1263,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       setAnswers(loaded.answers ?? {});
       setSummary(loaded.professionalSummary ?? "");
       setApplicationTab("test");
-      routerNavigate("/resultados");
+      if (loaded.evaluation?.id) {
+        const evaluation = await request<Evaluation>(
+          `/evaluations/${loaded.evaluation.id}`,
+        );
+        setSelectedEvaluation(evaluation);
+        await loadReports(evaluation.id);
+      }
+      if (navigateToResult) routerNavigate(`/resultados/${applicationId}`);
     } catch (err) {
       setMessage(
         err instanceof Error
@@ -1093,7 +1279,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       );
     }
   }
-  async function openReport(id: string) {
+  async function openReport(id: string, navigateToEditor = true) {
     try {
       const evaluation = await request<Evaluation>(`/evaluations/${id}`);
       setSelectedEvaluation(evaluation);
@@ -1113,7 +1299,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         referral: evaluation.referral ?? "",
       });
       await loadReports(id);
-      routerNavigate("/editor");
+      if (navigateToEditor) routerNavigate(`/laudos/${id}`);
     } catch (err) {
       setMessage(
         err instanceof Error ? err.message : "Não foi possível abrir o laudo.",
@@ -1154,6 +1340,15 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       );
     }
   }
+  const updateReferralSuggestion = (index: number, value: string) => {
+    const suggestions = reportContent.referral.split("\n");
+    while (suggestions.length < 10) suggestions.push("");
+    suggestions[index] = value;
+    setReportContent({
+      ...reportContent,
+      referral: suggestions.join("\n").replace(/\n+$/, ""),
+    });
+  };
   async function saveAnswers() {
     if (!application) return;
     await request(`/evaluations/applications/${application.id}/answers`, {
@@ -1162,6 +1357,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     });
     setMessage("Respostas salvas.");
   }
+  const mergeApplicationUpdate = (updated: Partial<Application>) => {
+    setApplication((current) =>
+      current
+        ? {
+            ...current,
+            ...updated,
+            instrumentVersion:
+              updated.instrumentVersion ?? current.instrumentVersion,
+          }
+        : current,
+    );
+  };
   const requiredFieldsMissing = () =>
     application?.instrumentVersion.formSchema.sections
       .flatMap((section) => section.fields)
@@ -1185,8 +1392,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       return;
     }
     await saveAnswers();
-    setApplication(
-      await request<Application>(
+    mergeApplicationUpdate(
+      await request<Partial<Application>>(
         `/evaluations/applications/${application.id}/calculate`,
         { method: "POST" },
       ),
@@ -1199,8 +1406,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       method: "PATCH",
       body: JSON.stringify({ summary }),
     });
-    setApplication(
-      await request<Application>(
+    mergeApplicationUpdate(
+      await request<Partial<Application>>(
         `/evaluations/applications/${application.id}/review`,
         { method: "POST" },
       ),
@@ -1209,8 +1416,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   }
   async function lock() {
     if (!application) return;
-    setApplication(
-      await request<Application>(
+    mergeApplicationUpdate(
+      await request<Partial<Application>>(
         `/evaluations/applications/${application.id}/lock`,
         { method: "POST" },
       ),
@@ -1219,12 +1426,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   }
   async function reopen() {
     if (!application) return;
-    setApplication(
-      await request<Application>(
+    mergeApplicationUpdate(
+      await request<Partial<Application>>(
         `/evaluations/applications/${application.id}/reopen`,
         { method: "POST" },
       ),
     );
+    setApplicationTab("test");
     setMessage("Aplicação reaberta para edição.");
   }
   async function previewReport(id: string) {
@@ -1238,14 +1446,38 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     window.open(url, "_blank", "noopener,noreferrer");
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
+  const openReportExport = () => {
+    if (!selectedEvaluation) return;
+    setReportExportSettings({
+      chapters: {
+        coverPage: false,
+        identification: true,
+        demand: true,
+        procedures: true,
+        anamnesis: true,
+        conclusion: true,
+        referral: true,
+        references: true,
+        deliveryTerm: true,
+      },
+      tests: Object.fromEntries(
+        (selectedEvaluation.applications ?? []).map((application) => [
+          application.id,
+          { table: true, chart: true },
+        ]),
+      ),
+    });
+    setReportExportOpen(true);
+  };
   async function generateReport() {
     if (!selectedEvaluation) return;
     const report = await request<{ id: string }>(
       `/reports/evaluations/${selectedEvaluation.id}`,
-      { method: "POST" },
+      { method: "POST", body: JSON.stringify(reportExportSettings) },
     );
     await loadReports(selectedEvaluation.id);
     await previewReport(report.id);
+    setReportExportOpen(false);
     setMessage("PDF gerado e aberto para visualização.");
   }
   const canEdit =
@@ -1262,8 +1494,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       patient: "/pacientes",
       patientEdit: "/pacientes",
       reports: "/laudos",
-      editor: "/editor",
+      editor: "/laudos",
       results: "/resultados",
+      platformTests: "/testes-da-plataforma",
+      platformTest: "/testes-da-plataforma",
       profile: "/perfil",
       settings: "/configuracoes",
     };
@@ -1305,8 +1539,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           >
             ▤ <span>Laudos</span>
           </NavLink>
-          <NavLink to="/resultados" onClick={() => setMobileMenu(false)}>
-            ◈ <span>Resultados</span>
+          <NavLink
+            to="/testes-da-plataforma"
+            className={view === "platformTest" ? "active" : undefined}
+            onClick={() => setMobileMenu(false)}
+          >
+            ◫ <span>Testes da Plataforma</span>
           </NavLink>
           <NavLink to="/perfil" onClick={() => setMobileMenu(false)}>
             ◉ <span>Perfil</span>
@@ -1353,8 +1591,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </header>
         {message && (
-          <div className="notice">
-            {message}
+          <div className="snackbar" role="status" aria-live="polite">
+            <span className="snackbar-icon" aria-hidden="true">i</span>
+            <span className="snackbar-message">{message}</span>
             <button onClick={() => setMessage("")} aria-label="Fechar aviso">
               ×
             </button>
@@ -1456,12 +1695,22 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                             <th>Criado</th>
                             <th>Nome</th>
                             <th>Telefone</th>
-                            <th>Opções</th>
                           </tr>
                         </thead>
                         <tbody>
                           {patients.map((patient) => (
-                            <tr key={patient.id}>
+                            <tr
+                              className="patient-table-row"
+                              key={patient.id}
+                              tabIndex={0}
+                              onClick={() => openDetails(patient.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  openDetails(patient.id);
+                                }
+                              }}
+                            >
                               <td>
                                 {patient.createdAt
                                   ? new Date(
@@ -1471,14 +1720,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                               </td>
                               <td>{patient.name}</td>
                               <td>{patient.phone ?? "—"}</td>
-                              <td>
-                                <button
-                                  className="patients-details-button"
-                                  onClick={() => void openDetails(patient.id)}
-                                >
-                                  Detalhes
-                                </button>
-                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1548,45 +1789,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                   <div className="panel-actions">
                     <span className="panel-count">{evaluations.length}</span>
-                    {view === "reports" && (
-                      <button
-                        className="small"
-                        type="button"
-                        onClick={() => setReportFormOpen(true)}
-                      >
-                        Novo laudo
-                      </button>
-                    )}
+                    <button className="small" type="button" onClick={openReportForm}>
+                      Novo laudo
+                    </button>
                   </div>
                 </div>
-                {view === "dashboard" && (
-                  <form onSubmit={createEvaluation} className="stack-form">
-                    <label>
-                      Paciente
-                      <select
-                        value={patientId}
-                        onChange={(event) => setPatientId(event.target.value)}
-                        required
-                      >
-                        <option value="">Selecione um paciente</option>
-                        {patients.map((patient) => (
-                          <option key={patient.id} value={patient.id}>
-                            {patient.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className="form-row">
-                      <input
-                        value={title}
-                        onChange={(event) => setTitle(event.target.value)}
-                        placeholder="Descrição da avaliação"
-                        required
-                      />
-                      <button type="submit">Criar</button>
-                    </div>
-                  </form>
-                )}
                 <form onSubmit={searchEvaluations} className="filter-form">
                   <input
                     placeholder="Buscar avaliação"
@@ -1620,17 +1827,32 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <table className="data-table">
                       <thead>
                         <tr>
+                          <th>Status</th>
                           <th>Data</th>
                           <th>Paciente</th>
                           <th>Laudo</th>
                           <th>Testes</th>
-                          <th>Status</th>
-                          <th aria-label="Ações" />
                         </tr>
                       </thead>
                       <tbody>
                         {evaluations.map((evaluation) => (
-                          <tr key={evaluation.id}>
+                          <tr
+                            className="report-table-row"
+                            key={evaluation.id}
+                            tabIndex={0}
+                            onClick={() => void openReport(evaluation.id)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                void openReport(evaluation.id);
+                              }
+                            }}
+                          >
+                            <td>
+                              <span className={statusClassName(evaluation.status)}>
+                                {statusLabel(evaluation.status)}
+                              </span>
+                            </td>
                             <td>
                               {new Date(
                                 evaluation.createdAt,
@@ -1638,19 +1860,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                             </td>
                             <td>{evaluation.patient.name}</td>
                             <td>{evaluation.title}</td>
-                            <td>{evaluation.applications?.length ?? 0}</td>
                             <td>
-                              <span className="status">
-                                {evaluation.status}
-                              </span>
-                            </td>
-                            <td>
-                              <button
-                                className="small"
-                                onClick={() => void openReport(evaluation.id)}
-                              >
-                                Editar
-                              </button>
+                              {evaluation.applications?.length ? (
+                                <div className="test-badges">
+                                  {evaluation.applications.map((application) => (
+                                    <span className="test-badge" key={application.id}>
+                                      {application.instrumentVersion?.instrument.name ?? "Instrumento"}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="muted">Nenhum teste</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1666,7 +1887,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                           <span>{evaluation.patient.name}</span>
                         </div>
                         <div className="evaluation-actions">
-                          <span className="status">{evaluation.status}</span>
+                          <span className={statusClassName(evaluation.status)}>{statusLabel(evaluation.status)}</span>
                           <button
                             className="small"
                             onClick={() => openInstrumentPicker(evaluation)}
@@ -1682,8 +1903,146 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         )}
+        {view === "platformTests" && (
+          <section className="platform-tests-page">
+            <div className="platform-tests-heading">
+              <div>
+                <span className="section-kicker">Catálogo clínico</span>
+                <h2>Testes da Plataforma</h2>
+                <p>
+                  Consulte os instrumentos disponíveis, suas características e
+                  critérios de utilização.
+                </p>
+              </div>
+              <span className="platform-tests-count">
+                {platformInstruments.length} teste{platformInstruments.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="platform-tests-grid">
+              {platformInstruments.map((instrument) => {
+                const metadata = instrument.versions[0]?.sourceMetadata?.platform;
+                if (!metadata) return null;
+                return (
+                  <article className="platform-test-card" key={instrument.id}>
+                    <div className="platform-test-card-top">
+                      <span className="platform-test-icon">AS</span>
+                      <span className="platform-test-category">{instrument.category}</span>
+                    </div>
+                    <h3>{instrument.name}</h3>
+                    <p>{metadata.subtitle}</p>
+                    <div className="platform-test-tags">
+                      <span>{metadata.audience}</span>
+                      <span>{metadata.itemCount} itens</span>
+                      <span>{metadata.format}</span>
+                    </div>
+                    <div className="platform-test-card-footer">
+                      <span>{metadata.purpose}</span>
+                      <button
+                        className="secondary small"
+                        onClick={() => routerNavigate(`/testes-da-plataforma/${instrument.code.toLowerCase()}`)}
+                      >
+                        Ver teste
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+        {view === "platformTest" && selectedPlatformInstrument && selectedPlatformMetadata && (
+          <section className="platform-test-page">
+            <button className="back-link" onClick={() => navigate("platformTests")}>
+              ← Voltar para testes da plataforma
+            </button>
+            <article className="panel platform-test-hero">
+              <div className="platform-test-hero-mark">AS</div>
+              <div>
+                <span className="section-kicker">{selectedPlatformInstrument.category}</span>
+                <h2>{selectedPlatformInstrument.name}</h2>
+                <p>{selectedPlatformMetadata.subtitle}</p>
+              </div>
+              <span className="platform-use-badge">{selectedPlatformMetadata.professionalUse}</span>
+            </article>
+            <div className="platform-test-layout">
+              <article className="panel platform-test-main">
+                <span className="section-kicker">Sobre o ASRS-18</span>
+                <h2>Conheça as características, a aplicação e os critérios utilizados pela plataforma.</h2>
+                <h3>O que é o ASRS-18?</h3>
+                <p>O ASRS-18 é uma escala de autorrelato criada pelo grupo da Organização Mundial da Saúde para rastrear manifestações de TDAH em adultos.</p>
+                <p>Seus 18 itens correspondem aos grupos de desatenção e hiperatividade/impulsividade e consideram os seis meses anteriores. A Parte A reúne seis itens com melhor desempenho de rastreio; a Parte B amplia a descrição clínica.</p>
+                <p>O resultado indica sinais que merecem investigação. Não confirma ou exclui TDAH sem entrevista, história desde a infância, prejuízo funcional, presença em diferentes contextos e avaliação de explicações alternativas.</p>
+                <div className="platform-domain-list">
+                  {selectedPlatformMetadata.domains.map((domain) => <span key={domain}>{domain}</span>)}
+                </div>
+                <h3>Como o instrumento funciona</h3>
+                <ol className="platform-steps">
+                  <li><strong>Parte A — 6 itens</strong><span>Núcleo breve de rastreamento, corrigido com limiares específicos por item.</span></li>
+                  <li><strong>Parte B — 12 itens</strong><span>Complementa a entrevista sobre variedade e frequência das manifestações.</span></li>
+                  <li><strong>Últimos seis meses</strong><span>O respondente informa com que frequência vivenciou cada situação.</span></li>
+                </ol>
+                <h3>Para que serve</h3>
+                <p>Identificar a frequência de sintomas relacionados ao TDAH e apoiar a decisão de realizar uma avaliação clínica mais aprofundada.</p>
+                <h3>O que ajuda a observar</h3>
+                <div className="platform-observation-grid">
+                  <div><strong>Desatenção</strong><span>Foco, organização, conclusão de tarefas e esquecimento.</span></div>
+                  <div><strong>Hiperatividade</strong><span>Inquietação e dificuldade de permanecer parado ou desacelerar.</span></div>
+                  <div><strong>Impulsividade</strong><span>Interrupção, precipitação e controle de respostas.</span></div>
+                </div>
+                <h3>Onde pode ser utilizado</h3>
+                <div className="platform-observation-grid">
+                  <div><strong>Triagem clínica</strong><span>Identificação de adultos que precisam de avaliação ampliada.</span></div>
+                  <div><strong>Entrevista</strong><span>Pontos de partida para coletar exemplos concretos.</span></div>
+                  <div><strong>Avaliação neuropsicológica</strong><span>Uma fonte dentro de um processo multimétodo.</span></div>
+                </div>
+                <h3>O que investigar além do resultado</h3>
+                <ul className="platform-checklist">
+                  <li>Há evidências de sintomas antes dos 12 anos?</li>
+                  <li>Existe prejuízo em trabalho, estudos, casa ou relações?</li>
+                  <li>Os sinais aparecem em mais de um contexto?</li>
+                  <li>Sono, ansiedade, depressão, substâncias ou condições médicas oferecem explicações alternativas?</li>
+                </ul>
+                <h3>Como a plataforma utiliza este teste</h3>
+                <p>A plataforma organiza as respostas dos 18 itens e aplica os critérios configurados para a versão brasileira, destacando o núcleo de rastreio e os domínios de desatenção e hiperatividade/impulsividade.</p>
+                <p>A correção informatizada apoia o registro e o laudo, mas a conclusão precisa ser conferida com a fonte técnica e integrada a dados clínicos e funcionais.</p>
+                <h3>Importante sobre a interpretação</h3>
+                <p>Os resultados não devem ser interpretados isoladamente. A conclusão profissional precisa integrar entrevista, observação, histórico, contexto da avaliação e outras fontes pertinentes, respeitando o manual e o escopo do instrumento.</p>
+              </article>
+              <aside className="platform-test-aside">
+                <article className="panel">
+                  <span className="section-kicker">Resumo do instrumento</span>
+                  <dl className="platform-summary">
+                    <div><dt>Itens</dt><dd>{selectedPlatformMetadata.itemCount}</dd></div>
+                    <div><dt>Público</dt><dd>{selectedPlatformMetadata.audience}</dd></div>
+                    <div><dt>Formato</dt><dd>{selectedPlatformMetadata.format}</dd></div>
+                    <div><dt>Finalidade</dt><dd>{selectedPlatformMetadata.purpose}</dd></div>
+                    <div><dt>Domínios</dt><dd>{selectedPlatformMetadata.domains.length}</dd></div>
+                    <div><dt>Autores</dt><dd>{selectedPlatformMetadata.authors}</dd></div>
+                    <div><dt>Uso profissional</dt><dd>{selectedPlatformMetadata.professionalUse}</dd></div>
+                  </dl>
+                </article>
+                <article className="panel platform-reference-card">
+                  <span className="section-kicker">Referências bibliográficas</span>
+                  <a href="https://doi.org/10.1017/S0033291704002892" target="_blank" rel="noreferrer">Kessler, R. C. et al. The World Health Organization Adult ADHD Self-Report Scale (ASRS). Psychological Medicine, 2005.</a>
+                  <a href="https://www.hcp.med.harvard.edu/ncs/asrs.php" target="_blank" rel="noreferrer">Harvard Medical School · ASRS Scales and Checklists</a>
+                  <a href="https://www.scielo.br/j/rpc/a/nnhNLNxkFSmQwVBSGZYdp6d/?format=html&amp;lang=pt" target="_blank" rel="noreferrer">Mattos, P. et al. Adaptação transcultural da ASRS para o português. Revista de Psiquiatria Clínica, 2006.</a>
+                </article>
+              </aside>
+            </div>
+          </section>
+        )}
+        {view === "platformTest" && !selectedPlatformInstrument && !loading && (
+          <section className="panel empty-view">
+            <h2>Teste não encontrado</h2>
+            <button onClick={() => navigate("platformTests")}>Ver testes da plataforma</button>
+          </section>
+        )}
         {view === "editor" && selectedEvaluation && (
-          <section className="report-editor">
+          <>
+            <button className="back-link report-editor-back" onClick={() => navigate("reports")}>
+              ← Voltar para laudos
+            </button>
+            <section className="report-editor">
             <aside className="report-outline">
               <span className="section-kicker">Capítulos</span>
               <button
@@ -1727,7 +2086,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <span>
                       {item.instrumentVersion?.instrument.name ?? "Instrumento"}
                     </span>
-                    <small>{item.status}</small>
+                      <small>{statusLabel(item.status)}</small>
                     <small>
                       Versão {item.instrumentVersion?.version ?? "-"}
                     </small>
@@ -1744,7 +2103,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               <div className="report-editor-heading">
                 <div>
                   <span className="section-kicker">
-                    {selectedEvaluation.status}
+                    {statusLabel(selectedEvaluation.status)}
                   </span>
                   <h2>{selectedEvaluation.title}</h2>
                   <p className="muted">
@@ -1758,16 +2117,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   {selectedEvaluation.applications?.some(
                     (item) => item.status === "LOCKED",
                   ) && (
-                    <button onClick={() => void generateReport()}>
-                      Exportar PDF
+                    <button onClick={openReportExport}>
+                      Exportar laudo
                     </button>
                   )}
-                  <button
-                    className="secondary"
-                    onClick={() => navigate("reports")}
-                  >
-                    Voltar aos laudos
-                  </button>
                 </div>
               </div>
               {reportChapter === "identification" && (
@@ -1915,21 +2268,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               )}
               {reportChapter === "referral" && (
                 <div className="chapter-form">
-                  <h3>Encaminhamento</h3>
-                  <label>
-                    Recomendações e encaminhamentos
-                    <textarea
-                      rows={12}
-                      value={reportContent.referral}
-                      onChange={(event) =>
-                        setReportContent({
-                          ...reportContent,
-                          referral: event.target.value,
-                        })
-                      }
-                      placeholder="Registre orientações, recomendações e encaminhamentos pertinentes."
-                    />
-                  </label>
+                  <h3>Sugestões de encaminhamento</h3>
+                  <div className="referral-suggestions">
+                    {Array.from({ length: 10 }, (_, index) => (
+                      <input
+                        key={index}
+                        value={reportContent.referral.split("\n")[index] ?? ""}
+                        onChange={(event) =>
+                          updateReferralSuggestion(index, event.target.value)
+                        }
+                        placeholder="Escreva a sugestão que você quer que apareça no laudo."
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="chapter-actions">
@@ -1968,7 +2319,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               )}
             </div>
-          </section>
+            </section>
+          </>
         )}
         {view === "editor" && !selectedEvaluation && (
           <section className="panel empty-view">
@@ -1977,8 +2329,22 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <button onClick={() => navigate("reports")}>Ir para laudos</button>
           </section>
         )}
-        {application && view === "results" && (
-          <section className="panel workspace" id="workspace">
+        {application && application.instrumentVersion?.instrument && view === "results" && (
+          <>
+            <button
+              className="back-link"
+              type="button"
+              onClick={() =>
+                routerNavigate(
+                  selectedEvaluation?.id || application.evaluation?.id
+                    ? `/laudos/${selectedEvaluation?.id ?? application.evaluation?.id}`
+                    : "/laudos",
+                )
+              }
+            >
+              ← Voltar ao laudo
+            </button>
+            <section className="panel workspace" id="workspace">
             <div className="workspace-header">
               <div>
                 <span className="section-kicker">Aplicação ativa</span>
@@ -1988,7 +2354,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   {selectedEvaluation?.patient.name}
                 </p>
               </div>
-              <span className="status">{application.status}</span>
+              <span className={statusClassName(application.status)}>{statusLabel(application.status)}</span>
             </div>
             <div
               className="tab-list application-tabs"
@@ -2019,11 +2385,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </div>
             {applicationTab === "test" && (
               <>
-                <div className="form-sections">
+                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : ""}`}>
                   {application.instrumentVersion.formSchema.sections.map(
                     (section) => (
                       <div key={section.id}>
                         <h3>{section.title}</h3>
+                        {section.fields[0]?.id.startsWith("asrs_") && (
+                          <div className="asrs-choice-header" aria-hidden="true">
+                            <span>Questões</span>
+                            {section.fields[0].options?.map((option) => (
+                              <span key={option.value}>{option.label}</span>
+                            ))}
+                          </div>
+                        )}
                         {section.fields.map((field) => (
                           <div className="instrument-field" key={field.id}>
                             <span>
@@ -2070,8 +2444,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   )}
                   {application.status === "LOCKED" && (
                     <>
-                      <button onClick={() => void generateReport()}>
-                        Gerar e visualizar PDF
+                      <button onClick={openReportExport}>
+                        Exportar laudo
                       </button>
                       <button
                         className="secondary"
@@ -2087,40 +2461,96 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             {applicationTab === "results" &&
               (application.result ? (
                 <div className="result-area">
-                  <h3>Síntese profissional</h3>
-                  <label>
-                    Revise o resultado e escreva sua síntese
-                    <textarea
-                      disabled={application.status === "LOCKED"}
-                      value={summary}
-                      onChange={(event) => setSummary(event.target.value)}
-                      rows={5}
-                    />
-                  </label>
-                  <div className="result result-table-wrap">
-                    <table className="result-table">
-                      <thead>
-                        <tr>
-                          <th>Indicador</th>
-                          <th>Resultado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(application.result).map(
-                          ([key, value]) => (
-                            <tr key={key}>
-                              <td>{key.replaceAll("_", " ")}</td>
-                              <td>
-                                {typeof value === "object"
-                                  ? JSON.stringify(value)
-                                  : String(value)}
-                              </td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  {application.instrumentVersion.instrument.name === "ASRS-18" ? (
+                    <>
+                      <div className="asrs-result-view-toggle" role="group" aria-label="Visualização dos resultados">
+                        <button
+                          className={asrsResultView === "table" ? "active" : ""}
+                          type="button"
+                          onClick={() => setAsrsResultView("table")}
+                        >
+                          ☷ Tabela
+                        </button>
+                        <button
+                          className={asrsResultView === "chart" ? "active" : ""}
+                          type="button"
+                          onClick={() => setAsrsResultView("chart")}
+                        >
+                          ▦ Gráfico
+                        </button>
+                      </div>
+                      {asrsResultView === "table" ? (
+                        <div className="result result-table-wrap">
+                          <table className="result-table">
+                            <thead><tr><th>Domínios</th><th>Pontuação</th><th>Classificação</th></tr></thead>
+                            <tbody>
+                              <tr><td>Parte A (Desatenção)</td><td>{String(application.result.inattention_symptom_count ?? "—")}</td><td>{String(application.result.inattention_classification ?? "—")}</td></tr>
+                              <tr><td>Parte B (Hiperatividade/Impulsividade)</td><td>{String(application.result.hyperactivity_impulsivity_symptom_count ?? "—")}</td><td>{String(application.result.hyperactivity_impulsivity_classification ?? "—")}</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="asrs-chart" role="img" aria-label="Gráfico das pontuações dos domínios do ASRS-18">
+                          <div className="asrs-chart-heading">
+                            <strong>ASRS-18</strong>
+                            <span>Faixa esperada: 0 a 4</span>
+                          </div>
+                          <div className="asrs-chart-plot">
+                            <div className="asrs-chart-scale" aria-hidden="true">
+                              {[9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((value) => <span key={value}>{value}</span>)}
+                            </div>
+                            <div className="asrs-chart-bars">
+                              {[
+                                ["Parte A (Desatenção)", Number(application.result.inattention_symptom_count ?? 0)],
+                                ["Parte B (Hiperatividade/Impulsividade)", Number(application.result.hyperactivity_impulsivity_symptom_count ?? 0)],
+                              ].map(([label, score]) => (
+                                <div className="asrs-chart-bar-group" key={String(label)}>
+                                  <span className="asrs-chart-score">{String(score)}</span>
+                                  <div className="asrs-chart-bar-track">
+                                    <span className="asrs-chart-bar" style={{ height: `${Math.max(0, Math.min(Number(score), 9)) / 9 * 100}%` }} />
+                                  </div>
+                                  <strong>{String(label)}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="asrs-result-interpretation">
+                        <h3>Interpretação dos resultados</h3>
+                        <label>
+                          Revise o resultado e escreva sua síntese
+                          <textarea
+                            disabled={application.status === "LOCKED"}
+                            value={summary}
+                            onChange={(event) => setSummary(event.target.value)}
+                            rows={5}
+                          />
+                        </label>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h3>Síntese profissional</h3>
+                      <label>
+                        Revise o resultado e escreva sua síntese
+                        <textarea
+                          disabled={application.status === "LOCKED"}
+                          value={summary}
+                          onChange={(event) => setSummary(event.target.value)}
+                          rows={5}
+                        />
+                      </label>
+                      <div className="result result-table-wrap">
+                        <table className="result-table">
+                          <thead><tr><th>Indicador</th><th>Resultado</th></tr></thead>
+                          <tbody>{Object.entries(application.result).map(([key, value]) => (
+                            <tr key={key}><td>{key.replaceAll("_", " ")}</td><td>{typeof value === "object" ? JSON.stringify(value) : String(value)}</td></tr>
+                          ))}</tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <p className="muted empty-state">
@@ -2139,7 +2569,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <div>
                   <dt>Status</dt>
-                  <dd>{application.status}</dd>
+                  <dd>{statusLabel(application.status)}</dd>
                 </div>
                 <div>
                   <dt>Aplicação</dt>
@@ -2177,9 +2607,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </ul>
               )}
             </div>
-          </section>
+            </section>
+          </>
         )}
-        {view === "results" && !application && (
+        {view === "results" && (!application || !application.instrumentVersion?.instrument) && (
           <section className="panel empty-view">
             <span className="section-kicker">
               Nenhuma aplicação selecionada
@@ -2374,13 +2805,33 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </p>
           </section>
         )}
+        {archivePatientId && (
+          <div className="modal-backdrop" onClick={() => setArchivePatientId(null)}>
+            <section
+              className="modal-card archive-patient-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="archive-patient-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button className="modal-close" type="button" aria-label="Fechar confirmação" onClick={() => setArchivePatientId(null)}>×</button>
+              <span className="section-kicker">Confirmar ação</span>
+              <h2 id="archive-patient-title">Arquivar paciente?</h2>
+              <p className="muted">O histórico será preservado, mas o cadastro deixará de aparecer nas listas de pacientes ativos.</p>
+              <div className="archive-patient-actions">
+                <button className="secondary" type="button" onClick={() => setArchivePatientId(null)}>Cancelar</button>
+                <button className="danger" type="button" onClick={() => void archivePatient()}>Arquivar paciente</button>
+              </div>
+            </section>
+          </div>
+        )}
         {instrumentPickerOpen && selectedEvaluation && (
           <div
             className="modal-backdrop"
             onClick={() => setInstrumentPickerOpen(false)}
           >
             <form
-              className="modal-card"
+              className="modal-card report-create-modal"
               onClick={(event) => event.stopPropagation()}
               onSubmit={(event) => {
                 event.preventDefault();
@@ -2408,9 +2859,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   }
                   required
                 >
-                  <option value="">Selecione um instrumento</option>
+                <option value="">Selecione um instrumento</option>
                   {instruments.flatMap((instrument) =>
-                    instrument.versions.map((version) => (
+                    instrument.versions
+                      .filter(
+                        (version) =>
+                          version.sourceMetadata?.platform?.applicationEnabled !== false,
+                      )
+                      .map((version) => (
                       <option key={version.id} value={version.id}>
                         {instrument.name} · versão {version.version}
                       </option>
@@ -2419,6 +2875,63 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </select>
               </label>
               <button type="submit">Adicionar teste</button>
+            </form>
+          </div>
+        )}
+        {reportExportOpen && selectedEvaluation && (
+          <div className="modal-backdrop" onClick={() => setReportExportOpen(false)}>
+            <form
+              className="modal-card report-export-modal"
+              onClick={(event) => event.stopPropagation()}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void generateReport();
+              }}
+            >
+              <button className="modal-close" type="button" onClick={() => setReportExportOpen(false)}>×</button>
+              <h2>Configuração do Laudo</h2>
+              <div className="report-export-grid">
+                <section>
+                  <h3>Configuração dos Capítulos</h3>
+                  <p>Indique quais seções devem ser incluídas no seu laudo.</p>
+                  <div className="report-export-options">
+                    {[
+                      ["coverPage", "Folha rosto"],
+                      ["identification", "Identificação"],
+                      ["demand", "Descrição da demanda"],
+                      ["procedures", "Procedimentos"],
+                      ["anamnesis", "Anamnese"],
+                      ["conclusion", "Conclusão"],
+                      ["referral", "Encaminhamento"],
+                      ["references", "Referências bibliográficas"],
+                      ["deliveryTerm", "Termo de entrega"],
+                    ].map(([key, label]) => (
+                      <div className="report-export-option" key={key}>
+                        <strong>{label}</strong>
+                        <label><input type="radio" name={key} checked={reportExportSettings.chapters[key]} onChange={() => setReportExportSettings({ ...reportExportSettings, chapters: { ...reportExportSettings.chapters, [key]: true } })} /> Sim</label>
+                        <label><input type="radio" name={key} checked={!reportExportSettings.chapters[key]} onChange={() => setReportExportSettings({ ...reportExportSettings, chapters: { ...reportExportSettings.chapters, [key]: false } })} /> Não</label>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section className="report-export-tests">
+                  <h3>Configuração dos Testes</h3>
+                  <p>Selecione quais ilustrações gráficas devem ser geradas no laudo para cada teste.</p>
+                  <div className="report-export-options">
+                    {(selectedEvaluation.applications ?? []).filter((application) => application.status === "LOCKED").map((application) => (
+                      <div className="report-export-option report-export-test-option" key={application.id}>
+                        <strong>{application.instrumentVersion?.instrument.name ?? "Instrumento"}</strong>
+                        <label><input type="checkbox" checked={reportExportSettings.tests[application.id]?.table ?? true} onChange={(event) => setReportExportSettings({ ...reportExportSettings, tests: { ...reportExportSettings.tests, [application.id]: { ...reportExportSettings.tests[application.id], table: event.target.checked } } })} /> Tabela</label>
+                        <label><input type="checkbox" checked={reportExportSettings.tests[application.id]?.chart ?? true} onChange={(event) => setReportExportSettings({ ...reportExportSettings, tests: { ...reportExportSettings.tests, [application.id]: { ...reportExportSettings.tests[application.id], chart: event.target.checked } } })} /> Gráfico</label>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <div className="report-export-actions">
+                <button className="secondary" type="button" onClick={() => setReportExportOpen(false)}>Fechar</button>
+                <button type="submit">⇩ Exportar laudo</button>
+              </div>
             </form>
           </div>
         )}
@@ -2439,18 +2952,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               >
                 ×
               </button>
-              <span className="section-kicker">Novo laudo</span>
-              <h2>Criar laudo</h2>
-              <p className="muted">
-                Selecione o paciente e dê um título para iniciar o processo
-                avaliativo.
-              </p>
+              <h2>Novo Laudo</h2>
               <label>
-                Paciente
+                Selecione um Paciente já Cadastrado
                 <select
                   value={patientId}
-                  onChange={(event) => setPatientId(event.target.value)}
-                  required
+                  onChange={(event) => {
+                    setPatientId(event.target.value);
+                    if (event.target.value) {
+                      setQuickPatientName("");
+                      setQuickPatientBirthDate("");
+                    }
+                  }}
                 >
                   <option value="">Selecione um paciente</option>
                   {details && !patients.some((patient) => patient.id === details.id) && (
@@ -2463,16 +2976,74 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   ))}
                 </select>
               </label>
-              <label>
-                Título do laudo
+              <div className="report-create-divider"><span>ou</span></div>
+              <div className="form-grid report-create-fields">
+              <label className="form-grid-wide">
+                <span><b>*</b> Nome do paciente</span>
                 <input
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Ex.: Avaliação neuropsicológica"
+                  value={quickPatientName}
+                  onChange={(event) => {
+                    setQuickPatientName(event.target.value);
+                    if (event.target.value) setPatientId("");
+                  }}
+                  placeholder="Insira um nome para o paciente"
+                  disabled={Boolean(patientId)}
+                />
+              </label>
+              <label>
+                <span><b>*</b> Data de nascimento</span>
+                <input
+                  type="date"
+                  value={quickPatientBirthDate}
+                  onChange={(event) => {
+                    setQuickPatientBirthDate(event.target.value);
+                    if (event.target.value) setPatientId("");
+                  }}
+                  disabled={Boolean(patientId)}
+                />
+              </label>
+              <label>
+                <span><b>*</b> Data de aplicação do teste</span>
+                <input
+                  type="date"
+                  value={applicationDate}
+                  onChange={(event) => setApplicationDate(event.target.value)}
                   required
                 />
               </label>
-              <button type="submit">Criar laudo</button>
+              </div>
+              <label>
+                Testes incluídos no laudo
+                <select
+                  multiple
+                  size={Math.min(Math.max(availableInstrumentVersions.length, 1), 4)}
+                  value={selectedInstrumentVersionIds}
+                  onChange={(event) =>
+                    setSelectedInstrumentVersionIds(
+                      Array.from(event.target.selectedOptions, (option) => option.value),
+                    )
+                  }
+                >
+                  {availableInstrumentVersions.length === 0 ? (
+                    <option disabled>Nenhum teste disponível</option>
+                  ) : (
+                    availableInstrumentVersions.map((instrument) => (
+                      <option
+                        key={instrument.id}
+                        value={instrument.id}
+                        disabled={!instrument.enabled}
+                      >
+                        {instrument.label}{instrument.enabled ? "" : " — em configuração"}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <small className="field-help">Use Ctrl ou Cmd para selecionar mais de um teste.</small>
+              </label>
+              <div className="report-create-actions">
+                <button className="secondary" type="button" onClick={() => setReportFormOpen(false)}>Cancelar</button>
+                <button type="submit">OK</button>
+              </div>
             </form>
           </div>
         )}
@@ -2492,7 +3063,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               onSubmit={createFullPatient}
             >
               <button
-                className={isPatientEditPage ? "patient-edit-back" : "modal-close"}
+                className={isPatientEditPage ? "back-link" : "modal-close"}
                 type="button"
                 aria-label={isPatientEditPage ? "Voltar para o paciente" : "Fechar cadastro"}
                 onClick={() => {
@@ -2782,7 +3353,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {view === "patient" && (
           <section className="patient-page">
             <button
-              className="patient-back-button"
+              className="back-link"
               type="button"
               onClick={() => navigate("patients")}
             >
@@ -2814,7 +3385,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <div className="patient-detail-buttons">
                   <button
-                    className="patient-action-primary"
+                    className="small patient-action-primary"
                     type="button"
                     onClick={() => createReportForPatient(details)}
                   >
@@ -2830,7 +3401,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   <button
                     className="small danger"
                     type="button"
-                    onClick={() => void archivePatient(details.id)}
+                    onClick={() => setArchivePatientId(details.id)}
                   >
                     Arquivar
                   </button>
@@ -2969,7 +3540,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                             · {item.applications.length} aplicação(ões)
                           </span>
                         </div>
-                        <span className="status">{item.status}</span>
+                        <span className={statusClassName(item.status)}>{statusLabel(item.status)}</span>
                       </li>
                     ))}
                   </ul>

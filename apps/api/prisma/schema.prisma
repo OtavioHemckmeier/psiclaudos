@@ -111,6 +111,7 @@ model Evaluation {
   professional   User         @relation(fields: [professionalId], references: [id])
   title          String
   status         String       @default("DRAFT")
+  applicationDate DateTime?
   requester      String?
   purpose        String?
   demandDescription String?

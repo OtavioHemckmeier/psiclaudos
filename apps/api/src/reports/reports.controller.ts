@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/auth.decorator';
@@ -11,7 +11,7 @@ export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
   @Post('evaluations/:evaluationId')
-  generate(@CurrentUser() user: AuthUser, @Param('evaluationId') id: string) { return this.reports.generate(user, id); }
+  generate(@CurrentUser() user: AuthUser, @Param('evaluationId') id: string, @Body() options?: object) { return this.reports.generate(user, id, options); }
 
   @Get('evaluations/:evaluationId')
   list(@CurrentUser() user: AuthUser, @Param('evaluationId') id: string) { return this.reports.list(user, id); }

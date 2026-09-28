@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
-import { demoInstrument } from './instrument-config';
+import { asrs18Instrument, demoInstrument } from './instrument-config';
 import { validateRules } from '@laudo/rule-engine';
 import type { InstrumentRule } from '@laudo/contracts';
 
@@ -21,10 +21,63 @@ export class CatalogService {
   }
 
   async seedDemo() {
+    await this.seedAsrs18();
     const existing = await this.prisma.instrumentDefinition.findUnique({ where: { code: demoInstrument.code } });
     if (existing) { await this.prisma.instrumentVersion.updateMany({ where: { instrumentId: existing.id, version: demoInstrument.version }, data: { presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue } }); return existing; }
     const contentHash = createHash('sha256').update(JSON.stringify(demoInstrument)).digest('hex');
     return this.prisma.instrumentDefinition.create({ data: { code: demoInstrument.code, name: demoInstrument.name, description: 'Configuração técnica sem conteúdo clínico protegido.', category: 'DEMONSTRATION', versions: { create: { version: demoInstrument.version, status: 'PUBLISHED', formSchema: demoInstrument.formSchema as unknown as Prisma.InputJsonValue, rules: demoInstrument.rules as unknown as Prisma.InputJsonValue, outputSchema: demoInstrument.outputSchema as unknown as Prisma.InputJsonValue, presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue, contentHash, publishedAt: new Date(), sourceMetadata: { type: 'INTERNAL_DEMO' }, licenseMetadata: { status: 'DEMONSTRATION_ONLY' } } } } });
+  }
+
+  private async seedAsrs18() {
+    const contentHash = createHash('sha256').update(JSON.stringify(asrs18Instrument)).digest('hex');
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: asrs18Instrument.code },
+      update: {
+        name: asrs18Instrument.name,
+        description: 'Escala de Autorrelato de TDAH em Adultos.',
+        category: 'TDAH',
+        status: 'ACTIVE',
+      },
+      create: {
+        code: asrs18Instrument.code,
+        name: asrs18Instrument.name,
+        description: 'Escala de Autorrelato de TDAH em Adultos.',
+        category: 'TDAH',
+      },
+    });
+    const existingVersion = await this.prisma.instrumentVersion.findFirst({
+      where: { instrumentId: instrument.id, version: asrs18Instrument.version },
+    });
+    const metadata = {
+      platform: {
+        subtitle: 'Escala de Autorrelato de TDAH em Adultos',
+        audience: 'Maiores de 18 anos',
+        authors: 'Organização Mundial da Saúde (OMS), Harvard Medical School',
+        itemCount: 18,
+        format: 'Autorrelato',
+        purpose: 'Rastreamento',
+        domains: ['Desatenção', 'Hiperatividade/impulsividade'],
+        professionalUse: 'Instrumento não privativo de psicólogos',
+        applicationEnabled: true,
+      },
+    };
+    const versionData = {
+      sourceMetadata: metadata as Prisma.InputJsonValue,
+      licenseMetadata: { status: 'CONFIGURATION_IN_PROGRESS' } as Prisma.InputJsonValue,
+      formSchema: asrs18Instrument.formSchema as unknown as Prisma.InputJsonValue,
+      rules: asrs18Instrument.rules as unknown as Prisma.InputJsonValue,
+      outputSchema: asrs18Instrument.outputSchema as unknown as Prisma.InputJsonValue,
+      presentationSchema: asrs18Instrument.presentationSchema as Prisma.InputJsonValue,
+      contentHash,
+      publishedAt: new Date(),
+    };
+    if (existingVersion) {
+      await this.prisma.instrumentVersion.update({ where: { id: existingVersion.id }, data: versionData });
+      return;
+    }
+    await this.prisma.instrumentVersion.create({
+      data: { instrumentId: instrument.id, version: asrs18Instrument.version, status: 'PUBLISHED', ...versionData },
+    });
   }
 
   async publish(input: { code: string; name: string; version: string; description?: string; formSchema: object; rules: object[]; outputSchema: object; presentationSchema?: object }) {
