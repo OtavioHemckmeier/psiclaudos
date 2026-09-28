@@ -739,6 +739,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("laudo_sidebar_collapsed") === "true",
+  );
   const [details, setDetails] = useState<PatientDetails | null>(null);
   const [patientDetailLoading, setPatientDetailLoading] = useState(false);
   const [patientDetailError, setPatientDetailError] = useState("");
@@ -753,6 +756,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     const timeout = window.setTimeout(() => setMessage(""), 5_000);
     return () => window.clearTimeout(timeout);
   }, [message]);
+  useEffect(() => {
+    localStorage.setItem("laudo_sidebar_collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
   const platformInstruments = instruments.filter(
     (instrument) => !["SNAP-IV", "SCARED-C", "SCARED-P"].includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
   );
@@ -1537,58 +1543,69 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     application.instrumentVersion.formSchema.sections.some((section) => section.id.startsWith("scared_p_form_"));
   const scaredPCurrentFormEnabled = answers[`scared_p_form_${scaredPFormTab}_enabled`] !== false;
   return (
-    <main className="dashboard-shell">
+    <main className={`dashboard-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
       <aside className={`sidebar ${mobileMenu ? "is-open" : ""}`}>
         <div className="sidebar-brand">
           <span className="brand-mark">L</span>
-          <div>
+          <div className="sidebar-label">
             <strong>Laudo</strong>
             <small>Correção psicológica</small>
           </div>
           <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"}
+            title={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"}
+          >
+            {sidebarCollapsed ? "›" : "‹"}
+          </button>
+          <button
+            type="button"
             className="sidebar-close"
             onClick={() => setMobileMenu(false)}
+            aria-label="Fechar menu lateral"
           >
             ×
           </button>
         </div>
         <div className="sidebar-context">
-          <span className="online-dot" />{" "}
-          {profile?.organization?.name ?? "Organização ativa"}
+          <span className="online-dot" />
+          <span>{profile?.organization?.name ?? "Organização ativa"}</span>
           <small>Workspace clínico</small>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end onClick={() => setMobileMenu(false)}>
-            ▦ <span>Visão geral</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">▦</span><span>Visão geral</span>
           </NavLink>
           <NavLink to="/pacientes" onClick={() => setMobileMenu(false)}>
-            ♙ <span>Pacientes</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">♙</span><span>Pacientes</span>
           </NavLink>
           <NavLink
             to="/laudos"
             className={view === "editor" ? "active" : undefined}
             onClick={() => setMobileMenu(false)}
           >
-            ▤ <span>Laudos</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">▤</span><span>Laudos</span>
           </NavLink>
           <NavLink
             to="/testes-da-plataforma"
             className={view === "platformTest" ? "active" : undefined}
             onClick={() => setMobileMenu(false)}
           >
-            ◫ <span>Testes da Plataforma</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">◫</span><span>Testes da Plataforma</span>
           </NavLink>
           <NavLink to="/perfil" onClick={() => setMobileMenu(false)}>
-            ◉ <span>Perfil</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">◉</span><span>Perfil</span>
           </NavLink>
           <NavLink to="/configuracoes" onClick={() => setMobileMenu(false)}>
-            ⚙ <span>Configurações</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">⚙</span><span>Configurações</span>
           </NavLink>
         </nav>
         <div className="sidebar-footer">
           <span>Ambiente local</span>
           <button className="sidebar-logout" onClick={logout}>
-            ↪ Sair
+            <span aria-hidden="true">↪</span><span>Sair</span>
           </button>
         </div>
       </aside>
