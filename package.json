@@ -9,8 +9,8 @@
   ],
   "scripts": {
     "dev:infra": "bash scripts/dev-infra.sh",
-    "dev:web": "docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.dev.yml up --build web-dev",
-    "dev:api": "docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.dev.yml up --build api-dev",
+    "dev:web": "docker compose --env-file .env -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.dev.yml up --build web-dev",
+    "dev:api": "docker compose --env-file .env -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.dev.yml up --build api-dev",
     "dev:web:local": "npm --workspace apps/web run dev",
     "dev:api:local": "npm --workspace packages/contracts run build && npm --workspace packages/rule-engine run build && npm --workspace apps/api run db:push && npm --workspace apps/api run db:backfill:evaluations && npm --workspace apps/api run build && bash scripts/dev-api-watch.sh",
     "build": "npm --workspace packages/contracts run build && npm --workspace packages/rule-engine run build && npm --workspace apps/api run build && npm --workspace apps/web run build",

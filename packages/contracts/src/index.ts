@@ -64,7 +64,13 @@ export interface InstrumentPresentationField {
 
 export interface InstrumentPresentationSchema {
   tables?: Array<{ title?: string; columns: InstrumentPresentationField[] }>;
-  charts?: Array<{ title?: string; type: 'BAR'; fields: InstrumentPresentationField[] }>;
+  charts?: Array<{
+    title?: string;
+    type: 'BAR';
+    fields: InstrumentPresentationField[];
+    maximum?: number;
+    expectedRange?: string;
+  }>;
 }
 
 export interface RuleTraceItem {

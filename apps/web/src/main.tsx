@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -23,6 +23,60 @@ new MutationObserver(applyAccessibilityAttributes).observe(
   document.documentElement,
   { childList: true, subtree: true },
 );
+
+function ReportExportMenu({ onSelect }: { onSelect: (destination: "pdf" | "googleDocs") => void }) {
+  const menuRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const menu = menuRef.current;
+      if (menu && event.target instanceof Node && !menu.contains(event.target))
+        menu.open = false;
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      const menu = menuRef.current;
+      if (event.key === "Escape" && menu?.open) {
+        menu.open = false;
+        menu.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
+  const select = (destination: "pdf" | "googleDocs") => {
+    if (menuRef.current) menuRef.current.open = false;
+    onSelect(destination);
+  };
+
+  return (
+    <details
+      ref={menuRef}
+      className="report-export-menu report-export-trigger"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          event.currentTarget.open = false;
+      }}
+    >
+      <summary><span>Exportar laudo</span></summary>
+      <div>
+        <span className="report-export-menu-label">Escolha o formato</span>
+        <button type="button" onClick={() => select("pdf")}>
+          <strong>PDF</strong>
+          <small>Arquivo pronto para imprimir</small>
+        </button>
+        <button type="button" onClick={() => select("googleDocs")}>
+          <strong>Google Docs</strong>
+          <small>Documento editável na nuvem</small>
+        </button>
+      </div>
+    </details>
+  );
+}
 
 type Patient = {
   id: string;
@@ -770,6 +824,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [instrumentVersionId, setInstrumentVersionId] = useState("");
   const [reports, setReports] = useState<Report[]>([]);
   const [reportExportOpen, setReportExportOpen] = useState(false);
+  const [reportExportDestination, setReportExportDestination] =
+    useState<"pdf" | "googleDocs">("pdf");
   const [reportExportSettings, setReportExportSettings] =
     useState<ReportExportSettings>({ chapters: {}, tests: {} });
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -1446,8 +1502,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     window.open(url, "_blank", "noopener,noreferrer");
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
-  const openReportExport = () => {
+  const openReportExport = (destination: "pdf" | "googleDocs") => {
     if (!selectedEvaluation) return;
+    setReportExportDestination(destination);
     setReportExportSettings({
       chapters: {
         coverPage: false,
@@ -1469,16 +1526,42 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     });
     setReportExportOpen(true);
   };
-  async function generateReport() {
+  const reportExportMenu = () => <ReportExportMenu onSelect={openReportExport} />;
+  async function generateReport(destination: "pdf" | "googleDocs") {
     if (!selectedEvaluation) return;
-    const report = await request<{ id: string }>(
-      `/reports/evaluations/${selectedEvaluation.id}`,
-      { method: "POST", body: JSON.stringify(reportExportSettings) },
-    );
-    await loadReports(selectedEvaluation.id);
-    await previewReport(report.id);
-    setReportExportOpen(false);
-    setMessage("PDF gerado e aberto para visualização.");
+    const googleTab = destination === "googleDocs" ? window.open("about:blank", "_blank") : null;
+    if (googleTab) {
+      googleTab.opener = null;
+      googleTab.document.title = "Abrindo Google Docs";
+      googleTab.document.body.textContent = "Preparando o laudo no Google Docs...";
+    }
+    try {
+      const report = await request<{ id: string }>(
+        `/reports/evaluations/${selectedEvaluation.id}`,
+        { method: "POST", body: JSON.stringify(reportExportSettings) },
+      );
+      await loadReports(selectedEvaluation.id);
+      if (destination === "pdf") {
+        await previewReport(report.id);
+        setReportExportOpen(false);
+        setMessage("PDF gerado e aberto para visualização.");
+        return;
+      }
+      const { authorizationUrl } = await request<{ authorizationUrl: string }>(
+        `/reports/${report.id}/google-docs`,
+        { method: "POST" },
+      );
+      setReportExportOpen(false);
+      if (googleTab) googleTab.location.href = authorizationUrl;
+      else window.open(authorizationUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      googleTab?.close();
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível exportar o laudo.",
+      );
+    }
   }
   const canEdit =
     application?.status === "IN_PROGRESS" || application?.status === "REOPENED";
@@ -2117,9 +2200,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   {selectedEvaluation.applications?.some(
                     (item) => item.status === "LOCKED",
                   ) && (
-                    <button onClick={openReportExport}>
-                      Exportar laudo
-                    </button>
+                    reportExportMenu()
                   )}
                 </div>
               </div>
@@ -2444,9 +2525,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   )}
                   {application.status === "LOCKED" && (
                     <>
-                      <button onClick={openReportExport}>
-                        Exportar laudo
-                      </button>
+                      {reportExportMenu()}
                       <button
                         className="secondary"
                         onClick={() => void reopen()}
@@ -2885,11 +2964,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               onClick={(event) => event.stopPropagation()}
               onSubmit={(event) => {
                 event.preventDefault();
-                void generateReport();
+                void generateReport(reportExportDestination);
               }}
             >
               <button className="modal-close" type="button" onClick={() => setReportExportOpen(false)}>×</button>
               <h2>Configuração do Laudo</h2>
+              {reportExportDestination === "googleDocs" && (
+                <p className="muted">
+                  Ao concluir, você será direcionado para autorizar e abrir o documento no Google Docs.
+                </p>
+              )}
               <div className="report-export-grid">
                 <section>
                   <h3>Configuração dos Capítulos</h3>
@@ -2930,7 +3014,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               </div>
               <div className="report-export-actions">
                 <button className="secondary" type="button" onClick={() => setReportExportOpen(false)}>Fechar</button>
-                <button type="submit">⇩ Exportar laudo</button>
+                <button type="submit">⇩ Exportar {reportExportDestination === "pdf" ? "PDF" : "Google Docs"}</button>
               </div>
             </form>
           </div>

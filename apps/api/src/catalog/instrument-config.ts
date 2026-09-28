@@ -131,5 +131,15 @@ export const asrs18Instrument: InstrumentDefinitionConfig = {
         { id: 'hyperactivity_impulsivity_classification', label: 'Classificação' },
       ],
     }],
+    charts: [{
+      title: 'Distribuição por domínio',
+      type: 'BAR',
+      maximum: 9,
+      expectedRange: '0 a 4',
+      fields: [
+        { id: 'inattention_symptom_count', label: 'Parte A (Desatenção)' },
+        { id: 'hyperactivity_impulsivity_symptom_count', label: 'Parte B (Hiperatividade/Impulsividade)' },
+      ],
+    }],
   },
 };

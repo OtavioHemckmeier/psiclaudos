@@ -11,6 +11,9 @@ services:
       API_PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-development-only-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-development-only-refresh-secret}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
       WEB_ORIGIN: http://localhost:5173
       SEED_DEMO_INSTRUMENT: ${SEED_DEMO_INSTRUMENT:-true}
       TSC_WATCHFILE: FixedPollingInterval

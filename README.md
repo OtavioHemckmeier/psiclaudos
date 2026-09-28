@@ -97,3 +97,15 @@ Para parar os containers de desenvolvimento, pressione `Ctrl+C` nos terminais da
 Se preferir executar API e web diretamente na máquina, rode `npm install`, depois `npm run dev:infra`, `npm run dev:api:local` e `npm run dev:web:local`.
 
 O instrumento incluído nesta etapa é apenas demonstrativo e não contém conteúdo clínico protegido.
+
+## Exportação para Google Docs
+
+No Google Cloud Console, crie um cliente OAuth 2.0 do tipo **Aplicação Web**, habilite as APIs Google Docs e Google Drive e cadastre a URL de redirecionamento da API. Em seguida, configure no `.env`:
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=seu-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=seu-client-secret
+GOOGLE_OAUTH_REDIRECT_URI=https://seu-dominio/api/reports/google-docs/callback
+```
+
+Ao escolher **Google Docs** no menu de exportação, o profissional autoriza sua conta Google e recebe um documento editável com o conteúdo, as tabelas de resultados e gráficos em PNG. Cada gráfico apresenta legenda, escala, resultado observado e faixa esperada; a imagem é enviada temporariamente ao Drive e excluída após sua inserção no documento.

@@ -39,6 +39,9 @@ services:
       DATABASE_URL: mongodb://mongodb:27017/laudo?replicaSet=rs0
       API_PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-development-only-change-me}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
       SEED_DEMO_INSTRUMENT: ${SEED_DEMO_INSTRUMENT:-true}
     volumes:
       - laudo-reports:/app/storage

@@ -13,6 +13,9 @@ export class ReportsController {
   @Post('evaluations/:evaluationId')
   generate(@CurrentUser() user: AuthUser, @Param('evaluationId') id: string, @Body() options?: object) { return this.reports.generate(user, id, options); }
 
+  @Post(':id/google-docs')
+  exportGoogleDocs(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.reports.startGoogleDocsExport(user, id); }
+
   @Get('evaluations/:evaluationId')
   list(@CurrentUser() user: AuthUser, @Param('evaluationId') id: string) { return this.reports.list(user, id); }
 

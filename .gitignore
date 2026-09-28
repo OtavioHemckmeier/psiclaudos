@@ -11,3 +11,4 @@ backups/
 .idea/workspace.xml
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
+apps/api/storage/
