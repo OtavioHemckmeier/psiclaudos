@@ -11,6 +11,7 @@ import { SnapIvCard, SnapIvPage } from "./snap-iv";
 import { SnapIvResults } from "./snap-iv-results";
 import { ScaredCCard, ScaredCPage } from "./scared-c";
 import { ScaredPCard, ScaredPPage, ScaredPResults } from "./scared-p";
+import { BaiCard, BaiPage } from "./bai";
 import { InstrumentFieldControl, type InstrumentField } from "./instrument-field";
 
 const API = import.meta.env.VITE_API_URL ?? "/api";
@@ -193,6 +194,7 @@ type Instrument = {
     version: string;
     sourceMetadata?: {
       platform?: PlatformInstrumentMetadata;
+      features?: { review?: boolean };
     } | null;
     formSchema: {
       sections: Array<{ id: string; title: string; fields: InstrumentField[] }>;
@@ -218,7 +220,7 @@ type Application = {
   professionalSummary?: string | null;
   evaluation?: { id: string };
   instrumentVersion: Instrument["versions"][number] & {
-    instrument: { name: string };
+    instrument: { name: string; code?: string };
   };
 };
 type Report = { id: string; revision: number; generatedAt: string };
@@ -742,6 +744,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("laudo_sidebar_collapsed") === "true",
   );
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("laudo_dark_mode") === "true",
+  );
   const [details, setDetails] = useState<PatientDetails | null>(null);
   const [patientDetailLoading, setPatientDetailLoading] = useState(false);
   const [patientDetailError, setPatientDetailError] = useState("");
@@ -759,8 +764,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     localStorage.setItem("laudo_sidebar_collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("laudo_dark_mode", String(darkMode));
+  }, [darkMode]);
   const platformInstruments = instruments.filter(
-    (instrument) => !["SNAP-IV", "SCARED-C", "SCARED-P"].includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
+    (instrument) => !["SNAP-IV", "SCARED-C", "SCARED-P", "BAI"].includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
   );
   const selectedPlatformInstrument = platformInstruments.find(
     (instrument) => instrument.code === platformTestCode,
@@ -1543,7 +1551,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     application.instrumentVersion.formSchema.sections.some((section) => section.id.startsWith("scared_p_form_"));
   const scaredPCurrentFormEnabled = answers[`scared_p_form_${scaredPFormTab}_enabled`] !== false;
   return (
-    <main className={`dashboard-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
+    <main className={`dashboard-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${darkMode ? "theme-dark" : ""}`}>
       <aside className={`sidebar ${mobileMenu ? "is-open" : ""}`}>
         <div className="sidebar-brand">
           <span className="brand-mark">L</span>
@@ -1620,6 +1628,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <p className="header-subtitle">{viewDetails[view].subtitle}</p>
           </div>
           <div className="header-actions">
+            <button
+              type="button"
+              className="secondary theme-toggle"
+              onClick={() => setDarkMode((enabled) => !enabled)}
+              aria-label={darkMode ? "Ativar modo claro" : "Ativar modo escuro"}
+              title={darkMode ? "Ativar modo claro" : "Ativar modo escuro"}
+            >
+              <span aria-hidden="true">{darkMode ? "☀" : "☾"}</span>
+              <span>{darkMode ? "Modo claro" : "Modo escuro"}</span>
+            </button>
             <button
               className="profile-chip"
               onClick={() => setProfileOpen(true)}
@@ -1964,13 +1982,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </p>
               </div>
               <span className="platform-tests-count">
-                {platformInstruments.length + 3} teste{platformInstruments.length + 3 === 1 ? "" : "s"}
+                {platformInstruments.length + 4} teste{platformInstruments.length + 4 === 1 ? "" : "s"}
               </span>
             </div>
             <div className="platform-tests-grid">
               <SnapIvCard onOpen={() => routerNavigate("/testes-da-plataforma/snap-iv")} />
               <ScaredCCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-c")} />
               <ScaredPCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-p")} />
+              <BaiCard onOpen={() => routerNavigate("/testes-da-plataforma/bai")} />
               {platformInstruments.map((instrument) => {
                 const metadata = instrument.versions[0]?.sourceMetadata?.platform;
                 if (!metadata) return null;
@@ -2010,6 +2029,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         )}
         {view === "platformTest" && platformTestCode === "SCARED-P" && (
           <ScaredPPage onBack={() => navigate("platformTests")} />
+        )}
+        {view === "platformTest" && platformTestCode === "BAI" && (
+          <BaiPage onBack={() => navigate("platformTests")} />
         )}
         {view === "platformTest" && selectedPlatformInstrument && selectedPlatformMetadata && (
           <section className="platform-test-page">
@@ -2092,7 +2114,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </section>
         )}
-        {view === "platformTest" && !["SNAP-IV", "SCARED-C", "SCARED-P"].includes(platformTestCode ?? "") && !selectedPlatformInstrument && !loading && (
+        {view === "platformTest" && !["SNAP-IV", "SCARED-C", "SCARED-P", "BAI"].includes(platformTestCode ?? "") && !selectedPlatformInstrument && !loading && (
           <section className="panel empty-view">
             <h2>Teste não encontrado</h2>
             <button onClick={() => navigate("platformTests")}>Ver testes da plataforma</button>
@@ -2505,7 +2527,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                   </>
                 )}
-                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : application.instrumentVersion.instrument.name === "SNAP-IV" ? "snapiv-form-sections" : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? "scared-form-sections" : ""}`}>
+                {application.instrumentVersion.instrument.code === "BAI" && (
+                  <p className="notice">A plataforma calcula somente o escore bruto total. Domínios, normas, classificação e inclusão no laudo permanecem indisponíveis até validação técnica e profissional.</p>
+                )}
+                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : application.instrumentVersion.instrument.code === "BAI" || application.instrumentVersion.instrument.name === "SNAP-IV" ? "snapiv-form-sections" : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? "scared-form-sections" : ""}`}>
                   {application.instrumentVersion.formSchema.sections.map(
                     (section) => (
                       (application.instrumentVersion.instrument.name !== "SNAP-IV" || !application.instrumentVersion.formSchema.sections.some((item) => item.id.startsWith("snap_iv_form_")) || section.id.startsWith(`snap_iv_form_${snapIvFormTab}_`)) &&
@@ -2515,8 +2540,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                         className={section.id.includes("_respondent_section") ? "snapiv-respondent-section" : section.id === "parent_report_respondent" ? "scared-respondent-section" : undefined}
                       >
                         <h3>{section.title}</h3>
-                        {(section.fields[0]?.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(section.fields[0]?.id ?? "") || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "")) && (
-                          <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "") ? "scared-choice-header" : section.fields[0]?.id.startsWith("snap_iv_") ? "snapiv-choice-header" : "asrs-choice-header"} aria-hidden="true">
+                        {(section.fields[0]?.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(section.fields[0]?.id ?? "") || section.fields[0]?.id.startsWith("bai_") || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "")) && (
+                          <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "") ? "scared-choice-header" : section.fields[0]?.id.startsWith("snap_iv_") || section.fields[0]?.id.startsWith("bai_") ? "snapiv-choice-header" : "asrs-choice-header"} aria-hidden="true">
                             <span>Questões</span>
                             {section.fields[0].options?.map((option) => (
                               <span key={option.value}>{option.label}</span>
@@ -2554,11 +2579,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                         Salvar rascunho
                       </button>
                       <button onClick={() => void calculate()}>
-                        Calcular resultado
+                        {application.instrumentVersion.instrument.code === "BAI" ? "Calcular escore bruto" : "Calcular resultado"}
                       </button>
                     </>
                   )}
-                  {application.status === "CALCULATED" && (
+                  {application.status === "CALCULATED" && application.instrumentVersion.sourceMetadata?.features?.review !== false && (
                     <button onClick={() => void review()}>
                       Confirmar revisão
                     </button>
@@ -2602,6 +2627,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       onSummaryChange={setSummary}
                       onSave={() => void saveSummary()}
                     />
+                  ) : application.instrumentVersion.instrument.code === "BAI" ? (
+                    <>
+                      <div className="result result-table-wrap">
+                        <table className="result-table">
+                          <thead><tr><th>Pontuação total</th><th>Itens respondidos</th><th>Classificação</th></tr></thead>
+                          <tbody><tr><td>{String(application.result.bai_total_raw ?? "—")} / 63</td><td>{String(application.result.bai_answered_items ?? "—")} / 21</td><td>Não disponível para esta versão</td></tr></tbody>
+                        </table>
+                      </div>
+                      <p>Este é apenas o somatório bruto das respostas. Não há classificação, interpretação por domínios ou conclusão clínica automatizada.</p>
+                    </>
                   ) : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? (
                     <>
                       {application.instrumentVersion.instrument.name === "SCARED-P" && (

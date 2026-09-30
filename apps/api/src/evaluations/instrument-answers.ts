@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { RuleEngineResult } from "@laudo/contracts";
 
 type FormSchema = {
-  sections?: Array<{ id: string; fields?: Array<{ id: string; required?: boolean }> }>;
+  sections?: Array<{ id: string; fields?: Array<{ id: string; label?: string; required?: boolean; options?: Array<{ value: string }> }> }>;
 };
 
 type PreparedAnswers = {
@@ -67,9 +67,9 @@ export function prepareInstrumentAnswers(code: string, schema: FormSchema, answe
   const hasTabbedScaredP = code === "SCARED-P" && (schema.sections ?? []).some((section) => section.id.startsWith("scared_p_form_"));
   const completedSnapIvForms = hasTabbedSnapIv ? prepareSnapIv(schema, answers, values) : [];
   const completedScaredPForms = hasTabbedScaredP ? prepareScaredP(schema, answers) : [];
-  const missingRequiredField = (schema.sections ?? []).flatMap((section) => section.fields ?? [])
-    .find((field) => field.required && !String(values[field.id] ?? "").trim());
-  if (missingRequiredField) throw new BadRequestException("Preencha todas as respostas obrigatórias antes de calcular.");
+  const invalidRequiredFields = (schema.sections ?? []).flatMap((section) => section.fields ?? [])
+    .filter((field) => field.required && (!String(values[field.id] ?? "").trim() || (field.options?.length && !field.options.some((option) => option.value === String(values[field.id])))));
+  if (invalidRequiredFields.length) throw new BadRequestException(`Corrija as respostas obrigatórias: ${invalidRequiredFields.map((field) => field.label ?? field.id).join(', ')}.`);
   if (code === "SCARED-C" || (code === "SCARED-P" && !hasTabbedScaredP)) {
     const prefix = code === "SCARED-C" ? "scared_c" : "scared_p";
     const itemIds = (schema.sections ?? []).flatMap((section) => section.fields ?? [])
@@ -81,6 +81,10 @@ export function prepareInstrumentAnswers(code: string, schema: FormSchema, answe
 }
 
 export function filterInstrumentResult(result: RuleEngineResult, prepared: PreparedAnswers): RuleEngineResult {
+  if (Object.prototype.hasOwnProperty.call(result.outputs, 'bai_total_raw')) {
+    result.outputs = Object.fromEntries(Object.entries(result.outputs).filter(([field]) => field === 'bai_total_raw' || field === 'bai_answered_items'));
+    return result;
+  }
   if (prepared.completedSnapIvForms.length) {
     const prefixes = prepared.completedSnapIvForms;
     result.outputs = Object.fromEntries(Object.entries(result.outputs).filter(([output]) =>

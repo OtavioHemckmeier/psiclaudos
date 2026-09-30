@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 import { asrs18Instrument, demoInstrument, snapIvInstrument } from './instrument-config';
 import { scaredCInstrument } from './scared-c-config';
 import { scaredPInstrument } from './scared-p-config';
+import { baiInstrument } from './bai-config';
 import { validateRules } from '@laudo/rule-engine';
 import type { InstrumentRule } from '@laudo/contracts';
 
@@ -39,10 +40,40 @@ export class CatalogService {
     await this.seedSnapIv();
     await this.seedScaredC();
     await this.seedScaredP();
+    await this.seedBai();
     const existing = await this.prisma.instrumentDefinition.findUnique({ where: { code: demoInstrument.code } });
     if (existing) { await this.prisma.instrumentVersion.updateMany({ where: { instrumentId: existing.id, version: demoInstrument.version }, data: { presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue } }); return existing; }
     const contentHash = createHash('sha256').update(JSON.stringify(demoInstrument)).digest('hex');
     return this.prisma.instrumentDefinition.create({ data: { code: demoInstrument.code, name: demoInstrument.name, description: 'Configuração técnica sem conteúdo clínico protegido.', category: 'DEMONSTRATION', versions: { create: { version: demoInstrument.version, status: 'PUBLISHED', formSchema: demoInstrument.formSchema as unknown as Prisma.InputJsonValue, rules: demoInstrument.rules as unknown as Prisma.InputJsonValue, outputSchema: demoInstrument.outputSchema as unknown as Prisma.InputJsonValue, presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue, contentHash, publishedAt: new Date(), sourceMetadata: { type: 'INTERNAL_DEMO' }, licenseMetadata: { status: 'DEMONSTRATION_ONLY' } } } } });
+  }
+
+  private async seedBai() {
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: baiInstrument.code },
+      update: { name: baiInstrument.name, description: 'Inventário de Ansiedade de Beck — versão Cunha 2001.', category: 'Ansiedade', status: 'ACTIVE' },
+      create: { code: baiInstrument.code, name: baiInstrument.name, description: 'Inventário de Ansiedade de Beck — versão Cunha 2001.', category: 'Ansiedade' },
+    });
+    const contentHash = createHash('sha256').update(JSON.stringify(baiInstrument)).digest('hex');
+    const versionData = {
+      formSchema: baiInstrument.formSchema as unknown as Prisma.InputJsonValue,
+      rules: baiInstrument.rules as unknown as Prisma.InputJsonValue,
+      outputSchema: baiInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+      presentationSchema: baiInstrument.presentationSchema as unknown as Prisma.InputJsonValue,
+      contentHash,
+      sourceMetadata: { platform: {
+        subtitle: 'Beck Anxiety Inventory — versão Cunha 2001', audience: 'Adultos a partir de 18 anos',
+        authors: 'Aaron T. Beck, Robert A. Steer e Jurema Alcides Cunha',
+        itemCount: 21, format: 'Autorrelato', purpose: 'Sintomas de ansiedade',
+        domains: [], professionalUse: 'Restrito a psicólogos', applicationEnabled: true,
+      }, calculation: { type: 'SUM', itemMinimum: 0, itemMaximum: 3, scoreMinimum: 0, scoreMaximum: 63, output: 'bai_total_raw' }, norms: { enabled: false }, classification: { enabled: false }, interpretation: { enabled: false }, regulatory: { source: 'SATEPSI / Conselho Federal de Psicologia', status: 'DESFAVORAVEL', statusDate: '2018-04-11', reason: 'Estudos de normatização vencidos' }, features: { rawScore: true, review: true, export: true } } as Prisma.InputJsonValue,
+      licenseMetadata: { status: 'USER_AUTHORIZED_2026-09-28', modalities: ['DIGITAL_APPLICATION', 'RESPONSE_STORAGE'], correctionStatus: 'RAW_SCORE_ONLY' } as Prisma.InputJsonValue,
+    };
+    const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: baiInstrument.version } });
+    if (existing) {
+      await this.updateSeedVersion(existing, baiInstrument.code, versionData);
+      return;
+    }
+    await this.prisma.instrumentVersion.create({ data: { instrumentId: instrument.id, version: baiInstrument.version, status: 'PUBLISHED', publishedAt: new Date(), ...versionData } });
   }
 
   private async seedScaredC() {

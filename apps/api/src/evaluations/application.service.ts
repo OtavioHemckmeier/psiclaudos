@@ -34,6 +34,9 @@ export class ApplicationService {
 
   async review(user: AuthUser, id: string) {
     const application = await this.evaluations.getApplication(user, id);
+    const sourceMetadata = application.instrumentVersion.sourceMetadata as { features?: { review?: boolean } } | null;
+    if (sourceMetadata?.features?.review === false)
+      throw new BadRequestException('Esta versão não pode ser revisada, bloqueada ou exportada enquanto as regras clínicas permanecerem desabilitadas.');
     if (application.status !== 'CALCULATED') throw new BadRequestException('Calcule o instrumento antes da revisão.');
     return this.prisma.instrumentApplication.update({ where: { id }, data: { status: 'REVIEWED', reviewedAt: new Date() } }).then(async (updated) => { await this.evaluations.syncStatus(updated.evaluationId); await this.audit.record(user, 'INSTRUMENT_REVIEWED', 'InstrumentApplication', id); return this.evaluations.getApplication(user, updated.id); });
   }

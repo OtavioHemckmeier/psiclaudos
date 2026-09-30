@@ -27,6 +27,12 @@ export type InstrumentReportTable =
 const sharedScaredReference = "Birmaher, B. et al. The Screen for Child Anxiety Related Emotional Disorders (SCARED): scale construction and psychometric characteristics. JACAAP, 1997. https://pubmed.ncbi.nlm.nih.gov/9100430/";
 
 const reportContent: Record<string, InstrumentReportContent> = {
+  "BAI": {
+    purpose: "registrar a intensidade de sintomas de ansiedade por autorrelato, conforme a versão em português selecionada.",
+    theoreticalContext: "O BAI reúne 21 itens com respostas de 0 a 3. Nesta versão, a plataforma apresenta somente a soma bruta das respostas, de 0 a 63.",
+    interpretation: "A classificação normativa e a interpretação clínica automática não estão disponíveis para esta versão, cujo status regulatório deve ser considerado pelo profissional responsável.",
+    references: ["Cunha, J. A. Manual da versão em português das Escalas Beck. São Paulo: Casa do Psicólogo, 2001.", "SATEPSI — Sistema de Avaliação de Testes Psicológicos / Conselho Federal de Psicologia. Consulta de testes desfavoráveis."],
+  },
   "ASRS-18": {
     purpose: "avaliar a frequência de manifestações de desatenção e hiperatividade/impulsividade em adultos, auxiliando na identificação de casos que requerem avaliação clínica aprofundada.",
     theoreticalContext: "A ASRS-18 é uma escala de autorrelato voltada ao rastreamento de manifestações de desatenção e hiperatividade/impulsividade em adultos. Seus indicadores descrevem frequência de sintomas e devem ser compreendidos à luz do funcionamento cotidiano, da história clínica e de outras fontes da avaliação.",
@@ -81,6 +87,9 @@ export const instrumentReportPresentation = (code: string, result: Record<string
 export const scaredReportTableNote = "Pontuação: soma dos itens da dimensão (0 a 2 por item; total de 0 a 82). Ponto de corte: referência de rastreamento da ficha original. Atingir o corte sugere investigação clínica; ficar abaixo dele não exclui sintomas ou transtorno.";
 
 export function instrumentReportTables(code: string, result: Record<string, unknown>, presentation: PresentationSchema): InstrumentReportTable[] {
+  if (code === "BAI" && "bai_total_raw" in result) {
+    return [{ kind: "matrix", title: "BAI — resultado", headers: ["Pontuação total", "Itens respondidos", "Classificação"], rows: [[`${String(result.bai_total_raw)} / 63`, `${String(result.bai_answered_items ?? 21)} / 21`, "Não disponível para esta versão"]] }];
+  }
   if (code === "SNAP-IV") {
     const formNumbers = [...new Set(Object.keys(result)
       .map((field) => field.match(/^snap_iv_form_(\d+)_(?:inattention|hyperactivity_impulsivity|opposition_defiance)_score$/)?.[1])

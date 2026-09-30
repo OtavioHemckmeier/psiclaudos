@@ -12,7 +12,7 @@ Marcar como concluído somente após cumprir os critérios de liberação deste 
 - [~] 02. SNAP-IV — formulário de 26 itens configurado com informante pais/responsáveis ou professor(a); somas por domínio disponíveis, aguardando conferência profissional da versão e critérios de interpretação.
 - [ ] 03. SCARED — crianças/adolescentes.
 - [ ] 04. SCARED — pais.
-- [ ] 05. BAI — confirmar edição.
+- [~] 05. BAI — edição identificada como BAI-2023-BR; aguardando manual, licença e validação profissional.
 - [ ] 06. BDI — confirmar edição, incluindo se será BDI-II.
 - [ ] 07. CDI — confirmar edição.
 - [ ] 08. MASC — confirmar edição.
