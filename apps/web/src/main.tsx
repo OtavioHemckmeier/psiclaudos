@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -7,6 +7,29 @@ import {
   useNavigate,
 } from "react-router-dom";
 import "./styles.css";
+import "./ios.css";
+import "./clean.css";
+import { APP_NAME, APP_TAGLINE, BrandMark } from "./brand";
+import {
+  CheckSealIcon,
+  ChecklistIcon,
+  CloseIcon,
+  DocIcon,
+  GearIcon,
+  HomeIcon,
+  InfoIcon,
+  LogoutIcon,
+  MenuIcon,
+  PeopleIcon,
+  PersonCircleIcon,
+  SidebarIcon,
+} from "./icons";
+import {
+  AppearanceControls,
+  ThemeToggle,
+  useThemePreferences,
+  type ThemePreferences,
+} from "./theme";
 import { SnapIvCard, SnapIvPage } from "./snap-iv";
 import { SnapIvResults } from "./snap-iv-results";
 import { ScaredCCard, ScaredCPage } from "./scared-c";
@@ -341,6 +364,27 @@ const viewDetails: Record<WorkspaceView, { title: string; subtitle: string }> =
     },
   };
 
+type NavItem = {
+  to: string;
+  label: string;
+  shortLabel: string;
+  Icon: ComponentType<{ size?: number }>;
+  end?: boolean;
+  /** Rota-filha que também deve marcar o item como ativo. */
+  activeView?: WorkspaceView;
+  /** Exibido na tab bar inferior em telas pequenas. */
+  inTabBar: boolean;
+};
+
+const navItems: NavItem[] = [
+  { to: "/", label: "Visão geral", shortLabel: "Início", Icon: HomeIcon, end: true, inTabBar: true },
+  { to: "/pacientes", label: "Pacientes", shortLabel: "Pacientes", Icon: PeopleIcon, inTabBar: true },
+  { to: "/laudos", label: "Laudos", shortLabel: "Laudos", Icon: DocIcon, activeView: "editor", inTabBar: true },
+  { to: "/testes-da-plataforma", label: "Testes da Plataforma", shortLabel: "Testes", Icon: ChecklistIcon, activeView: "platformTest", inTabBar: true },
+  { to: "/perfil", label: "Perfil", shortLabel: "Perfil", Icon: PersonCircleIcon, inTabBar: true },
+  { to: "/configuracoes", label: "Configurações", shortLabel: "Ajustes", Icon: GearIcon, inTabBar: false },
+];
+
 const statusLabel = (status?: string) =>
   ({
     DRAFT: "Rascunho",
@@ -494,10 +538,10 @@ function Login({ onLogin }: { onLogin: () => void }) {
       <div className="auth-layout">
         <section className="auth-intro">
           <div className="brand-lockup">
-            <span className="brand-mark">L</span>
+            <BrandMark size={44} />
             <div>
-              <strong>Laudo</strong>
-              <small>Correção psicológica</small>
+              <strong>{APP_NAME}</strong>
+              <small>{APP_TAGLINE}</small>
             </div>
           </div>
           <span className="auth-kicker">Workspace clínico</span>
@@ -649,7 +693,21 @@ function Login({ onLogin }: { onLogin: () => void }) {
   );
 }
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+const greetingFor = (date: Date) => {
+  const hour = date.getHours();
+  if (hour < 5) return "Boa noite";
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+};
+
+function Dashboard({
+  onLogout,
+  theme,
+}: {
+  onLogout: () => void;
+  theme: ThemePreferences;
+}) {
   const location = useLocation();
   const routerNavigate = useNavigate();
   const view = viewFromPathname(location.pathname);
@@ -744,9 +802,24 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("laudo_sidebar_collapsed") === "true",
   );
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("laudo_dark_mode") === "true",
-  );
+  const darkMode = theme.isDark;
+  // Altura real da barra superior fixa, para que painéis "sticky" (ex.: índice do
+  // editor de laudo) parem logo abaixo dela em vez de passar por baixo.
+  const topbarRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const topbar = topbarRef.current;
+    if (!topbar) return;
+    const root = document.documentElement;
+    const update = () =>
+      root.style.setProperty("--topbar-height", `${topbar.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(topbar);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--topbar-height");
+    };
+  }, []);
   const [details, setDetails] = useState<PatientDetails | null>(null);
   const [patientDetailLoading, setPatientDetailLoading] = useState(false);
   const [patientDetailError, setPatientDetailError] = useState("");
@@ -764,9 +837,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     localStorage.setItem("laudo_sidebar_collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-  useEffect(() => {
-    localStorage.setItem("laudo_dark_mode", String(darkMode));
-  }, [darkMode]);
   const platformInstruments = instruments.filter(
     (instrument) => !["SNAP-IV", "SCARED-C", "SCARED-P", "BAI"].includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
   );
@@ -1554,10 +1624,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     <main className={`dashboard-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${darkMode ? "theme-dark" : ""}`}>
       <aside className={`sidebar ${mobileMenu ? "is-open" : ""}`}>
         <div className="sidebar-brand">
-          <span className="brand-mark">L</span>
+          <BrandMark size={34} />
           <div className="sidebar-label">
-            <strong>Laudo</strong>
-            <small>Correção psicológica</small>
+            <strong>{APP_NAME}</strong>
+            <small>{APP_TAGLINE}</small>
           </div>
           <button
             type="button"
@@ -1566,7 +1636,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"}
             title={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"}
           >
-            {sidebarCollapsed ? "›" : "‹"}
+            <SidebarIcon size={18} />
           </button>
           <button
             type="button"
@@ -1574,7 +1644,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             onClick={() => setMobileMenu(false)}
             aria-label="Fechar menu lateral"
           >
-            ×
+            <CloseIcon size={16} />
           </button>
         </div>
         <div className="sidebar-context">
@@ -1582,62 +1652,74 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           <span>{profile?.organization?.name ?? "Organização ativa"}</span>
           <small>Workspace clínico</small>
         </div>
-        <nav className="sidebar-nav">
-          <NavLink to="/" end onClick={() => setMobileMenu(false)}>
-            <span className="sidebar-nav-icon" aria-hidden="true">▦</span><span>Visão geral</span>
-          </NavLink>
-          <NavLink to="/pacientes" onClick={() => setMobileMenu(false)}>
-            <span className="sidebar-nav-icon" aria-hidden="true">♙</span><span>Pacientes</span>
-          </NavLink>
-          <NavLink
-            to="/laudos"
-            className={view === "editor" ? "active" : undefined}
-            onClick={() => setMobileMenu(false)}
-          >
-            <span className="sidebar-nav-icon" aria-hidden="true">▤</span><span>Laudos</span>
-          </NavLink>
-          <NavLink
-            to="/testes-da-plataforma"
-            className={view === "platformTest" ? "active" : undefined}
-            onClick={() => setMobileMenu(false)}
-          >
-            <span className="sidebar-nav-icon" aria-hidden="true">◫</span><span>Testes da Plataforma</span>
-          </NavLink>
-          <NavLink to="/perfil" onClick={() => setMobileMenu(false)}>
-            <span className="sidebar-nav-icon" aria-hidden="true">◉</span><span>Perfil</span>
-          </NavLink>
-          <NavLink to="/configuracoes" onClick={() => setMobileMenu(false)}>
-            <span className="sidebar-nav-icon" aria-hidden="true">⚙</span><span>Configurações</span>
-          </NavLink>
+        <nav className="sidebar-nav" aria-label="Navegação principal">
+          {navItems.map(({ to, label, Icon, end, activeView }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              title={sidebarCollapsed ? label : undefined}
+              className={activeView && view === activeView ? "active" : undefined}
+              onClick={() => setMobileMenu(false)}
+            >
+              <span className="sidebar-nav-icon" aria-hidden="true">
+                <Icon size={18} />
+              </span>
+              <span>{label}</span>
+            </NavLink>
+          ))}
         </nav>
         <div className="sidebar-footer">
           <span>Ambiente local</span>
           <button className="sidebar-logout" onClick={logout}>
-            <span aria-hidden="true">↪</span><span>Sair</span>
+            <span className="sidebar-nav-icon" aria-hidden="true">
+              <LogoutIcon size={18} />
+            </span>
+            <span>Sair</span>
           </button>
         </div>
       </aside>
+      {mobileMenu && (
+        <div
+          className="sidebar-scrim"
+          aria-hidden="true"
+          onClick={() => setMobileMenu(false)}
+        />
+      )}
       <div className="dashboard-main">
-        <header className="topbar">
-          <button className="mobile-menu" onClick={() => setMobileMenu(true)}>
-            ☰
+        <header className="topbar" ref={topbarRef}>
+          <button
+            className="mobile-menu"
+            onClick={() => setMobileMenu(true)}
+            aria-label="Abrir menu"
+          >
+            <MenuIcon size={20} />
           </button>
-          <div>
-            <p className="eyebrow">Workspace clínico</p>
-            <h1>{viewDetails[view].title}</h1>
+          <div className="topbar-title">
+            {view === "dashboard" ? (
+              <>
+                <p className="eyebrow">
+                  {new Date().toLocaleDateString("pt-BR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </p>
+                <h1>
+                  {greetingFor(new Date())}
+                  {profile?.name ? `, ${profile.name.split(" ")[0]}` : ""}
+                </h1>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow">Workspace clínico</p>
+                <h1>{viewDetails[view].title}</h1>
+              </>
+            )}
             <p className="header-subtitle">{viewDetails[view].subtitle}</p>
           </div>
           <div className="header-actions">
-            <button
-              type="button"
-              className="secondary theme-toggle"
-              onClick={() => setDarkMode((enabled) => !enabled)}
-              aria-label={darkMode ? "Ativar modo claro" : "Ativar modo escuro"}
-              title={darkMode ? "Ativar modo claro" : "Ativar modo escuro"}
-            >
-              <span aria-hidden="true">{darkMode ? "☀" : "☾"}</span>
-              <span>{darkMode ? "Modo claro" : "Modo escuro"}</span>
-            </button>
+            <ThemeToggle theme={theme} />
             <button
               className="profile-chip"
               onClick={() => setProfileOpen(true)}
@@ -1659,7 +1741,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </header>
         {message && (
           <div className="snackbar" role="status" aria-live="polite">
-            <span className="snackbar-icon" aria-hidden="true">i</span>
+            <span className="snackbar-icon" aria-hidden="true"><InfoIcon size={18} /></span>
             <span className="snackbar-message">{message}</span>
             <button onClick={() => setMessage("")} aria-label="Fechar aviso">
               ×
@@ -1669,21 +1751,21 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {view === "dashboard" && (
           <section className="overview-stats">
             <article>
-              <span className="stat-icon orange">♙</span>
+              <span className="stat-icon orange" aria-hidden="true"><PeopleIcon size={20} /></span>
               <div>
                 <strong>{patients.length}</strong>
                 <span>Pacientes ativos</span>
               </div>
             </article>
             <article>
-              <span className="stat-icon blue">▤</span>
+              <span className="stat-icon blue" aria-hidden="true"><DocIcon size={20} /></span>
               <div>
                 <strong>{evaluations.length}</strong>
                 <span>Avaliações criadas</span>
               </div>
             </article>
             <article>
-              <span className="stat-icon green">✓</span>
+              <span className="stat-icon green" aria-hidden="true"><CheckSealIcon size={20} /></span>
               <div>
                 <strong>
                   {
@@ -2036,7 +2118,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {view === "platformTest" && selectedPlatformInstrument && selectedPlatformMetadata && (
           <section className="platform-test-page">
             <button className="back-link" onClick={() => navigate("platformTests")}>
-              ← Voltar para testes da plataforma
+              Voltar para testes da plataforma
             </button>
             <article className="panel platform-test-hero">
               <div className="platform-test-hero-mark">AS</div>
@@ -2123,7 +2205,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {(view === "editor" || view === "results") && selectedEvaluation && (
           <>
             <button className="back-link report-editor-back" onClick={() => navigate("reports")}>
-              ← Voltar para laudos
+              Voltar para laudos
             </button>
             <section className="report-editor">
             <aside className="report-outline">
@@ -2983,14 +3065,29 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </section>
         )}
         {view === "settings" && (
-          <section className="panel empty-view">
-            <span className="section-kicker">Em preparação</span>
-            <h2>Configurações da organização</h2>
-            <p className="muted">
-              Esta área receberá os dados institucionais, a identidade do
-              documento e as permissões de acesso nas próximas fases.
-            </p>
-          </section>
+          <div className="settings-page">
+            <section className="panel settings-appearance">
+              <div className="panel-heading">
+                <div>
+                  <span className="section-kicker">Personalização</span>
+                  <h2>Aparência</h2>
+                  <p className="muted">
+                    Escolha entre o modo claro e o escuro. A preferência fica
+                    salva neste navegador.
+                  </p>
+                </div>
+              </div>
+              <AppearanceControls theme={theme} />
+            </section>
+            <section className="panel empty-view">
+              <span className="section-kicker">Em preparação</span>
+              <h2>Configurações da organização</h2>
+              <p className="muted">
+                Esta área receberá os dados institucionais, a identidade do
+                documento e as permissões de acesso nas próximas fases.
+              </p>
+            </section>
+          </div>
         )}
         {archivePatientId && (
           <div className="modal-backdrop" onClick={() => setArchivePatientId(null)}>
@@ -3264,7 +3361,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     routerNavigate(`/pacientes/${editingPatientId}`);
                 }}
               >
-                {isPatientEditPage ? "← Voltar para o paciente" : "×"}
+                {isPatientEditPage ? "Voltar para o paciente" : "×"}
               </button>
               <div className="patient-form-heading">
                 <span className="section-kicker">Cadastro de pacientes</span>
@@ -3549,7 +3646,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               type="button"
               onClick={() => navigate("patients")}
             >
-              ← Voltar para pacientes
+              Voltar para pacientes
             </button>
             {patientDetailLoading ? (
               <div className="panel patient-detail-panel">
@@ -3850,11 +3947,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
       </div>
+      <nav className="ios-tabbar" aria-label="Navegação rápida">
+        {navItems
+          .filter((item) => item.inTabBar)
+          .map(({ to, shortLabel, Icon, end, activeView }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={activeView && view === activeView ? "active" : undefined}
+            >
+              <Icon size={23} />
+              <span>{shortLabel}</span>
+            </NavLink>
+          ))}
+      </nav>
     </main>
   );
 }
 
 function App() {
+  const theme = useThemePreferences();
   const [authenticated, setAuthenticated] = useState(
     Boolean(localStorage.getItem("laudo_token")),
   );
@@ -3864,7 +3977,7 @@ function App() {
     return () => window.removeEventListener("laudo-session-expired", expire);
   }, []);
   return authenticated ? (
-    <Dashboard onLogout={() => setAuthenticated(false)} />
+    <Dashboard theme={theme} onLogout={() => setAuthenticated(false)} />
   ) : (
     <Login onLogin={() => setAuthenticated(true)} />
   );

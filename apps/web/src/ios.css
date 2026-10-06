@@ -1,0 +1,2188 @@
+/*
+ * Tema visual inspirado no iOS (cores do sistema, materiais "glass",
+ * listas agrupadas, controles segmentados, sheets e tab bar).
+ * Este arquivo fica fora de @layer, então sobrepõe styles.css (camada "base").
+ */
+
+/* ───────────────────────── Tokens ───────────────────────── */
+:root {
+  --ios-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Inter, "Segoe UI", Roboto, system-ui, sans-serif;
+  --ios-font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+    "Helvetica Neue", Inter, system-ui, sans-serif;
+
+  --ios-bg: #f2f2f7;
+  --ios-card: #ffffff;
+  --ios-card-2: #f7f7fa;
+  --ios-card-3: #efeff4;
+  --ios-fill: rgba(118, 118, 128, 0.12);
+  --ios-fill-2: rgba(118, 118, 128, 0.08);
+  --ios-fill-strong: rgba(118, 118, 128, 0.2);
+  --ios-label: #000000;
+  --ios-label-2: rgba(60, 60, 67, 0.72);
+  --ios-label-3: rgba(60, 60, 67, 0.45);
+  --ios-sep: rgba(60, 60, 67, 0.16);
+  --ios-sep-strong: rgba(60, 60, 67, 0.29);
+
+  --ios-blue: #007aff;
+  --ios-green: #34c759;
+  --ios-orange: #ff9500;
+  --ios-red: #ff3b30;
+  --ios-yellow: #ffcc00;
+  --ios-indigo: #5856d6;
+  --ios-purple: #af52de;
+  --ios-pink: #ff2d55;
+  --ios-teal: #30b0c7;
+  --ios-gray: #8e8e93;
+  /* Destaque: texto/ícones (--ios-tint) e fundos com texto branco (--ios-tint-fill).
+     Valores por cor de destaque ficam em glass.css (html[data-accent]). */
+  --ios-tint: #0066d6;
+  --ios-tint-fill: #0066d6;
+  --ios-tint-bright: #007aff;
+  --ios-on-tint: #ffffff;
+
+  --ios-glass: rgba(255, 255, 255, 0.72);
+  --ios-glass-strong: rgba(255, 255, 255, 0.86);
+  --ios-glass-border: rgba(255, 255, 255, 0.7);
+  --ios-glass-blur: saturate(180%) blur(22px);
+  --ios-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --ios-shadow-float: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --ios-shadow-knob: 0 3px 8px rgba(0, 0, 0, 0.15), 0 3px 1px rgba(0, 0, 0, 0.06);
+
+  --ios-radius-sm: 10px;
+  --ios-radius: 14px;
+  --ios-radius-lg: 20px;
+  --ios-radius-xl: 28px;
+  --ios-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  color-scheme: light;
+  font-family: var(--ios-font);
+  color: var(--ios-label);
+  background: var(--ios-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Paleta escura do iOS: aplicada ao app (toggle) e à tela de login (preferência do sistema). */
+.theme-dark,
+html.theme-dark-root {
+  --ios-bg: #000000;
+  --ios-card: #1c1c1e;
+  --ios-card-2: #2c2c2e;
+  --ios-card-3: #3a3a3c;
+  --ios-fill: rgba(118, 118, 128, 0.24);
+  --ios-fill-2: rgba(118, 118, 128, 0.16);
+  --ios-fill-strong: rgba(118, 118, 128, 0.36);
+  --ios-label: #ffffff;
+  --ios-label-2: rgba(235, 235, 245, 0.68);
+  --ios-label-3: rgba(235, 235, 245, 0.38);
+  --ios-sep: rgba(84, 84, 88, 0.55);
+  --ios-sep-strong: rgba(84, 84, 88, 0.85);
+
+  --ios-blue: #0a84ff;
+  --ios-green: #30d158;
+  --ios-orange: #ff9f0a;
+  --ios-red: #ff453a;
+  --ios-yellow: #ffd60a;
+  --ios-indigo: #5e5ce6;
+  --ios-purple: #bf5af2;
+  --ios-pink: #ff375f;
+  --ios-teal: #40c8e0;
+  --ios-gray: #8e8e93;
+
+  --ios-glass: rgba(28, 28, 30, 0.7);
+  --ios-glass-strong: rgba(28, 28, 30, 0.86);
+  --ios-glass-border: rgba(255, 255, 255, 0.08);
+  --ios-shadow-card: none;
+  --ios-shadow-float: 0 12px 48px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+/* ───────────────────────── Base ───────────────────────── */
+html,
+body {
+  background: var(--ios-bg);
+}
+body {
+  margin: 0;
+  color: var(--ios-label);
+  font-family: var(--ios-font);
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+::selection {
+  background: color-mix(in srgb, var(--ios-tint) 28%, transparent);
+}
+h1,
+h2,
+h3 {
+  color: var(--ios-label);
+  letter-spacing: -0.022em;
+}
+a {
+  color: var(--ios-tint);
+}
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ios-tint) 55%, transparent);
+  outline-offset: 2px;
+}
+.muted,
+.header-subtitle,
+.field-help {
+  color: var(--ios-label-2);
+}
+.eyebrow,
+.section-kicker {
+  padding: 0;
+  color: var(--ios-label-2);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.skip-link {
+  border-radius: 999px;
+  color: #fff;
+  background: var(--ios-blue);
+}
+.skip-link:focus {
+  outline: 3px solid color-mix(in srgb, var(--ios-blue) 40%, transparent);
+}
+
+/* ───────────────────────── Botões ───────────────────────── */
+button {
+  min-height: 36px;
+  padding: 0.55rem 1.05rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ios-on-tint);
+  background: var(--ios-tint-fill);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    transform 0.18s var(--ios-ease),
+    background-color 0.18s ease,
+    opacity 0.18s ease,
+    color 0.18s ease;
+}
+button:hover {
+  background: color-mix(in srgb, var(--ios-tint-fill) 88%, #000);
+  box-shadow: none;
+  transform: none;
+}
+button:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+button.secondary {
+  color: var(--ios-tint);
+  background: var(--ios-fill);
+}
+button.secondary:hover {
+  background: var(--ios-fill-strong);
+}
+button.danger {
+  color: var(--ios-red);
+  background: color-mix(in srgb, var(--ios-red) 12%, transparent);
+}
+button.danger:hover {
+  background: color-mix(in srgb, var(--ios-red) 18%, transparent);
+}
+button.small,
+.small {
+  min-height: 30px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+}
+.link-button,
+.back-link {
+  min-height: 0;
+  padding: 0.2rem 0;
+  border-radius: 6px;
+  color: var(--ios-tint);
+  background: transparent;
+  font-weight: 500;
+}
+.link-button:hover,
+.back-link:hover {
+  color: var(--ios-tint);
+  background: transparent;
+  opacity: 0.7;
+}
+/* Chevron de "voltar" do iOS; o texto dos botões não leva seta. */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.back-link::before {
+  width: 0.55em;
+  height: 0.95em;
+  flex: 0 0 auto;
+  background: currentColor;
+  content: "";
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 18'%3E%3Cpath d='M8.5 1.5 1.5 9l7 7.5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 18'%3E%3Cpath d='M8.5 1.5 1.5 9l7 7.5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* ───────────────────────── Campos ───────────────────────── */
+label {
+  color: var(--ios-label);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+input,
+select,
+textarea {
+  min-height: 42px;
+  padding: 0.62rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--ios-radius-sm);
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+  font-family: inherit;
+  font-size: 0.95rem;
+  box-shadow: none;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--ios-label-3);
+}
+input:hover,
+select:hover,
+textarea:hover {
+  background: var(--ios-fill);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: transparent;
+  background: var(--ios-card);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ios-tint) 40%, transparent);
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--ios-label-2);
+  opacity: 0.75;
+}
+textarea {
+  line-height: 1.5;
+}
+select:not([multiple]) {
+  appearance: none;
+  padding-right: 2.2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 9 5-5 5 5M7 15l5 5 5-5'/%3E%3C/svg%3E");
+  background-position: right 0.85rem center;
+  background-repeat: no-repeat;
+}
+.theme-dark input:focus,
+.theme-dark select:focus,
+.theme-dark textarea:focus {
+  background-color: var(--ios-card-2);
+}
+
+/* Radios e caixas múltiplas: círculo com check, como em listas do iOS. */
+input[type="radio"],
+.choice-list input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--ios-sep-strong);
+  border-radius: 50%;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s var(--ios-ease);
+}
+input[type="radio"]:hover,
+.choice-list input[type="checkbox"]:hover {
+  border-color: var(--ios-tint);
+  background: transparent;
+}
+input[type="radio"]:checked,
+.choice-list input[type="checkbox"]:checked {
+  border-color: var(--ios-tint);
+  background: var(--ios-tint-fill)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E")
+    center / 14px no-repeat;
+  transform: scale(1.04);
+}
+input[type="radio"]:focus,
+.choice-list input[type="checkbox"]:focus {
+  background-color: transparent;
+  box-shadow: none;
+}
+input[type="radio"]:checked:focus,
+.choice-list input[type="checkbox"]:checked:focus {
+  background-color: var(--ios-tint);
+}
+input[type="radio"]:focus-visible,
+.choice-list input[type="checkbox"]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ios-tint) 40%, transparent);
+  outline-offset: 2px;
+}
+input[type="radio"]:disabled,
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Valores booleanos viram o switch do iOS. */
+.boolean-field input[type="checkbox"],
+.report-export-option input[type="checkbox"] {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  min-width: 46px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: var(--ios-fill-strong);
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+.boolean-field input[type="checkbox"]::after,
+.report-export-option input[type="checkbox"]::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--ios-shadow-knob);
+  content: "";
+  transition: transform 0.28s var(--ios-ease);
+}
+.boolean-field input[type="checkbox"]:checked,
+.report-export-option input[type="checkbox"]:checked {
+  background: var(--ios-green);
+}
+.boolean-field input[type="checkbox"]:checked::after,
+.report-export-option input[type="checkbox"]:checked::after {
+  transform: translateX(18px);
+}
+.boolean-field input[type="checkbox"]:focus,
+.report-export-option input[type="checkbox"]:focus {
+  box-shadow: none;
+}
+.boolean-field input[type="checkbox"]:focus-visible,
+.report-export-option input[type="checkbox"]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ios-tint) 45%, transparent);
+  outline-offset: 2px;
+}
+.boolean-field {
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+}
+.choice-list {
+  gap: 0;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: var(--ios-radius-sm);
+  background: var(--ios-card-2);
+}
+.choice-list label {
+  min-height: 44px;
+  gap: 0.75rem;
+  border-bottom: 0.5px solid var(--ios-sep);
+}
+.choice-list label:last-child {
+  border-bottom: 0;
+}
+
+/* ───────────────────────── Login (wallpaper + vidro) ───────────────────────── */
+.auth-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--ios-label);
+  background:
+    radial-gradient(60% 60% at 15% 10%, rgba(90, 200, 250, 0.55), transparent 70%),
+    radial-gradient(55% 55% at 85% 20%, rgba(175, 82, 222, 0.42), transparent 70%),
+    radial-gradient(60% 60% at 70% 95%, rgba(255, 149, 0, 0.35), transparent 70%),
+    radial-gradient(50% 50% at 10% 90%, rgba(255, 45, 85, 0.3), transparent 70%),
+    #eef1fb;
+}
+.auth-shell::before {
+  position: absolute;
+  z-index: -1;
+  inset: -20%;
+  background:
+    radial-gradient(35% 35% at 30% 40%, rgba(0, 122, 255, 0.35), transparent 70%),
+    radial-gradient(30% 30% at 70% 60%, rgba(88, 86, 214, 0.3), transparent 70%);
+  content: "";
+  filter: blur(40px);
+  animation: ios-wallpaper 22s ease-in-out infinite alternate;
+}
+@keyframes ios-wallpaper {
+  from { transform: translate3d(-3%, -2%, 0) rotate(0deg); }
+  to { transform: translate3d(3%, 2%, 0) rotate(8deg); }
+}
+html.theme-dark-root .auth-shell {
+  background:
+    radial-gradient(60% 60% at 15% 10%, rgba(10, 132, 255, 0.45), transparent 70%),
+    radial-gradient(55% 55% at 85% 20%, rgba(191, 90, 242, 0.35), transparent 70%),
+    radial-gradient(60% 60% at 70% 95%, rgba(255, 55, 95, 0.28), transparent 70%),
+    #05060a;
+}
+.auth-layout {
+  gap: clamp(2rem, 6vw, 5rem);
+}
+.brand-mark {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 22.5%;
+  color: #fff;
+  background: linear-gradient(160deg, #5ac8fa 0%, #007aff 48%, #5856d6 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 6px 16px rgba(0, 122, 255, 0.3);
+  font-family: var(--ios-font-rounded);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.brand-mark::after {
+  position: absolute;
+  inset: 0 0 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent);
+  content: "";
+}
+.sidebar-brand strong,
+.brand-lockup strong {
+  color: var(--ios-label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.sidebar-brand small,
+.brand-lockup small {
+  color: var(--ios-label-2);
+  font-weight: 500;
+}
+.auth-kicker {
+  padding: 0.38rem 0.8rem;
+  border: 0.5px solid var(--ios-glass-border);
+  color: var(--ios-label);
+  background: var(--ios-glass);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.auth-intro h1 {
+  color: var(--ios-label);
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+.auth-intro > p {
+  color: var(--ios-label-2);
+  font-size: 1.05rem;
+}
+.auth-points {
+  gap: 0.55rem;
+  color: var(--ios-label);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.auth-points span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.45rem 0.85rem;
+  border: 0.5px solid var(--ios-glass-border);
+  border-radius: 999px;
+  background: var(--ios-glass);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+}
+.auth-points span::first-letter {
+  color: var(--ios-green);
+}
+.auth-card {
+  padding: 2.2rem;
+  border: 0.5px solid var(--ios-glass-border);
+  border-radius: var(--ios-radius-xl);
+  background: var(--ios-glass);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  box-shadow: var(--ios-shadow-float);
+}
+.auth-card::before {
+  display: none;
+}
+.auth-card h2 {
+  margin-top: 0.4rem;
+  color: var(--ios-label);
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+.auth-card form {
+  gap: 0.85rem;
+  margin-top: 1.4rem;
+}
+.auth-card input {
+  min-height: 48px;
+  background: color-mix(in srgb, var(--ios-card) 70%, transparent);
+}
+.auth-card input:focus {
+  background: var(--ios-card);
+}
+.auth-card button[type="submit"] {
+  min-height: 50px;
+  margin-top: 0.4rem;
+  border-radius: var(--ios-radius);
+  font-size: 1rem;
+}
+.auth-card .link-button {
+  display: block;
+  margin-top: 0.9rem;
+  font-size: 0.92rem;
+}
+
+/* ───────────────────────── Estrutura do app ───────────────────────── */
+.dashboard-shell {
+  grid-template-columns: 268px minmax(0, 1fr);
+  color: var(--ios-label);
+  background: var(--ios-bg);
+}
+.dashboard-shell.sidebar-is-collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+/* Sidebar no estilo do app Ajustes / iPadOS */
+.sidebar {
+  gap: 1rem;
+  padding: 1.1rem 0.85rem;
+  border-right: 0.5px solid var(--ios-sep);
+  background: var(--ios-glass-strong);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  scrollbar-width: none;
+}
+.sidebar-brand {
+  padding: 0.2rem 0.35rem 0.4rem;
+}
+.sidebar-brand .brand-mark {
+  width: 38px;
+  height: 38px;
+  font-size: 1.15rem;
+}
+.sidebar-toggle,
+.sidebar-close {
+  display: grid;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 0;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ios-tint);
+  background: transparent;
+}
+.sidebar-toggle:hover,
+.sidebar-close:hover {
+  background: var(--ios-fill);
+}
+.sidebar-close {
+  display: none;
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+}
+.sidebar-context {
+  align-items: center;
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  border-radius: var(--ios-radius);
+  color: var(--ios-label);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-card);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.sidebar-context small {
+  color: var(--ios-label-2);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+.online-dot {
+  align-self: center;
+  margin-top: 0;
+  background: var(--ios-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ios-green) 22%, transparent);
+}
+.sidebar-nav {
+  gap: 2px;
+  padding: 0.35rem;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-card);
+}
+.sidebar-nav a,
+.sidebar-logout {
+  position: relative;
+  min-height: 44px;
+  gap: 0.8rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--ios-radius-sm);
+  color: var(--ios-label);
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.sidebar-nav a:hover,
+.sidebar-logout:hover {
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+.sidebar-nav a.active,
+.sidebar-nav a[aria-current="page"] {
+  color: #fff;
+  background: var(--ios-tint-fill);
+}
+.sidebar-nav a.active .sidebar-nav-icon,
+.sidebar-nav a[aria-current="page"] .sidebar-nav-icon {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+/* Ícones em quadrados coloridos, como no app Ajustes */
+.sidebar-nav-icon {
+  display: grid;
+  width: 29px;
+  min-width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--ios-gray);
+}
+.sidebar-footer {
+  gap: 0.55rem;
+  padding: 0.6rem 0.35rem 0;
+  border-top: 0;
+  color: var(--ios-label-3);
+  font-size: 0.72rem;
+}
+.sidebar-footer > span {
+  padding-left: 0.5rem;
+}
+.sidebar-logout {
+  display: flex;
+  width: 100%;
+  border-radius: var(--ios-radius);
+  color: var(--ios-red);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-card);
+}
+.sidebar-logout:hover {
+  color: var(--ios-red);
+  background: var(--ios-card);
+  opacity: 0.85;
+}
+.sidebar-is-collapsed .sidebar {
+  padding-inline: 0.6rem;
+}
+.sidebar-is-collapsed .sidebar-nav {
+  padding: 0.3rem;
+}
+.sidebar-is-collapsed .sidebar-nav a,
+.sidebar-is-collapsed .sidebar-logout {
+  justify-content: center;
+  padding-inline: 0;
+}
+.sidebar-is-collapsed .sidebar-nav a.active,
+.sidebar-is-collapsed .sidebar-nav a[aria-current="page"] {
+  background: var(--ios-fill);
+}
+.sidebar-is-collapsed .sidebar-context {
+  background: transparent;
+  box-shadow: none;
+}
+.sidebar-scrim {
+  display: none;
+}
+
+/* Conteúdo + barra superior com título grande */
+.dashboard-main {
+  padding: 0 2.2rem 3rem;
+}
+.topbar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  align-items: flex-end;
+  min-height: 0;
+  margin: 0 -2.2rem 1.6rem;
+  padding: 1.6rem 2.2rem 1rem;
+  border-bottom: 0.5px solid var(--ios-sep);
+  background: color-mix(in srgb, var(--ios-bg) 78%, transparent);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+}
+.topbar h1,
+.app-shell h1 {
+  margin: 0.15rem 0 0;
+  color: var(--ios-label);
+  font-size: clamp(1.75rem, 3vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+.topbar .header-subtitle {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+}
+.header-actions {
+  gap: 0.6rem;
+}
+.theme-toggle {
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0.4rem 0.85rem;
+  color: var(--ios-label);
+  background: var(--ios-fill);
+}
+.theme-toggle:hover {
+  background: var(--ios-fill-strong);
+}
+.profile-chip {
+  min-height: 0;
+  padding: 0.25rem 0.85rem 0.25rem 0.25rem;
+  border-radius: 999px;
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+.profile-chip:hover {
+  background: var(--ios-fill);
+}
+.profile-chip strong {
+  color: var(--ios-label);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.profile-chip small {
+  color: var(--ios-label-2);
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  background: linear-gradient(180deg, #a5a5ad, #85858c);
+  font-family: var(--ios-font-rounded);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.topbar-logout {
+  color: var(--ios-red);
+}
+.mobile-menu {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ios-tint);
+  background: var(--ios-fill);
+}
+.mobile-menu:hover {
+  background: var(--ios-fill-strong);
+}
+
+/* ───────────────────────── Notificação (banner) ───────────────────────── */
+.snackbar {
+  top: max(1rem, env(safe-area-inset-top));
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  gap: 0.7rem;
+  min-width: min(340px, calc(100vw - 2rem));
+  padding: 0.75rem 0.9rem;
+  border: 0.5px solid var(--ios-glass-border);
+  border-radius: 22px;
+  color: var(--ios-label);
+  background: var(--ios-glass-strong);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  box-shadow: var(--ios-shadow-float);
+  font-size: 0.88rem;
+  font-weight: 500;
+  transform: translateX(-50%);
+  animation: ios-banner-in 0.45s var(--ios-ease);
+}
+.snackbar::before {
+  display: none;
+}
+.snackbar::after {
+  right: 18px;
+  left: 18px;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ios-fill-strong);
+}
+.snackbar-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(180deg, #3b9bff, #007aff);
+  box-shadow: none;
+}
+.snackbar button {
+  display: grid;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 0;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+  font-size: 1rem;
+}
+.snackbar button:hover {
+  color: var(--ios-label);
+  background: var(--ios-fill-strong);
+}
+@keyframes ios-banner-in {
+  from { opacity: 0; transform: translate(-50%, -24px) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* ───────────────────────── Widgets (estatísticas) ───────────────────────── */
+.overview-stats {
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+}
+.overview-stats article {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 1.15rem 1.25rem;
+  border: 0;
+  border-radius: var(--ios-radius-lg);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-card);
+}
+.overview-stats strong {
+  color: var(--ios-label);
+  font-family: var(--ios-font-rounded);
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.overview-stats article div span {
+  color: var(--ios-label-2);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #fff;
+}
+.stat-icon.orange { color: #fff; background: linear-gradient(180deg, #4cd964, #28b44c); }
+.stat-icon.blue { color: #fff; background: linear-gradient(180deg, #ffad33, #ff9500); }
+.stat-icon.green { color: #fff; background: linear-gradient(180deg, #3b9bff, #007aff); }
+
+/* ───────────────────────── Cartões e seções ───────────────────────── */
+.panel,
+.platform-test-card,
+.report-outline,
+.asrs-chart {
+  border: 0;
+  border-radius: var(--ios-radius-lg);
+  color: var(--ios-label);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-card);
+}
+.panel {
+  padding: 1.5rem;
+}
+.panel h2,
+.panel > h2:first-child {
+  color: var(--ios-label);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.panel > h2:first-child::before {
+  display: none;
+}
+.panel-heading h2,
+.panel-heading h3 {
+  font-weight: 700;
+}
+.panel-count {
+  min-width: 28px;
+  height: 24px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+  font-family: var(--ios-font-rounded);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.workspace h3,
+.chapter-form h3,
+.modal-card h3 {
+  color: var(--ios-label);
+  font-weight: 600;
+}
+.form-section-title {
+  color: var(--ios-label-2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Listas agrupadas */
+ul {
+  gap: 0;
+}
+li {
+  padding: 0.75rem 0.9rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+li:hover {
+  border: 0;
+  background: transparent;
+}
+li span {
+  color: var(--ios-label-2);
+}
+.data-list {
+  overflow: hidden;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.data-list li {
+  position: relative;
+  min-height: 56px;
+  transition: background-color 0.15s ease;
+}
+.data-list li + li::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 3.4rem;
+  height: 0.5px;
+  background: var(--ios-sep);
+  content: "";
+}
+.data-list li:hover {
+  background: var(--ios-fill-2);
+}
+.data-list li strong {
+  color: var(--ios-label);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.data-list li span {
+  color: var(--ios-label-2);
+  font-size: 0.8rem;
+}
+.list-avatar,
+.data-list li .list-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(180deg, #a5a5ad, #85858c);
+  font-family: var(--ios-font-rounded);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.row-arrow,
+.data-list li .row-arrow,
+.patient-row b {
+  color: var(--ios-label-3);
+  font-weight: 600;
+}
+.patient-row small {
+  color: var(--ios-label-2);
+}
+.platform-steps li,
+.platform-checklist li,
+.notes-audit li,
+.report-history li {
+  border-radius: 0;
+  background: transparent;
+}
+.report-history,
+.patient-extra-fields,
+.patient-form-actions,
+.notes-audit,
+.report-editor-heading,
+.report-outline-tests {
+  border-color: var(--ios-sep);
+}
+
+/* Status em cápsula */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+.status::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+.status-draft,
+.status-not-started {
+  color: color-mix(in srgb, var(--ios-orange) 82%, var(--ios-label));
+  background: color-mix(in srgb, var(--ios-orange) 15%, transparent);
+}
+.status-in-progress,
+.status-reopened {
+  color: var(--ios-blue);
+  background: color-mix(in srgb, var(--ios-blue) 13%, transparent);
+}
+.status-calculated {
+  color: var(--ios-indigo);
+  background: color-mix(in srgb, var(--ios-indigo) 14%, transparent);
+}
+.status-reviewed {
+  color: var(--ios-purple);
+  background: color-mix(in srgb, var(--ios-purple) 14%, transparent);
+}
+.status-completed,
+.status-locked,
+.status-published,
+.status-active {
+  color: color-mix(in srgb, var(--ios-green) 80%, var(--ios-label));
+  background: color-mix(in srgb, var(--ios-green) 15%, transparent);
+}
+.status-archived {
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+}
+
+/* Avisos e erros */
+.notice {
+  padding: 0.8rem 1rem;
+  border: 0;
+  border-radius: var(--ios-radius);
+  color: color-mix(in srgb, var(--ios-green) 70%, var(--ios-label));
+  background: color-mix(in srgb, var(--ios-green) 13%, transparent);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.notice button {
+  min-height: 0;
+  color: inherit;
+  background: transparent;
+}
+.error {
+  color: var(--ios-red);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.result {
+  border: 0;
+  border-radius: var(--ios-radius);
+  color: var(--ios-label);
+  background: var(--ios-card-2);
+}
+
+/* ───────────────────────── Controle segmentado ───────────────────────── */
+.tab-list,
+.patient-page .tab-list,
+.asrs-result-view-toggle {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  overflow-x: auto;
+  margin-bottom: 1.2rem;
+  padding: 2px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ios-fill);
+  scrollbar-width: none;
+}
+.patient-page .tab-list {
+  margin-top: 1.25rem;
+}
+.tab-list button,
+.patient-page .tab-list button,
+.asrs-result-view-toggle button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0.3rem 1rem;
+  border-radius: 8px;
+  color: var(--ios-label);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.tab-list button:hover,
+.patient-page .tab-list button:hover,
+.asrs-result-view-toggle button:hover {
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+.tab-list button.active,
+.patient-page .tab-list button.active,
+.asrs-result-view-toggle button.active,
+.asrs-result-view-toggle button.active:hover {
+  color: var(--ios-label);
+  background: var(--ios-card);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04);
+  font-weight: 600;
+}
+.theme-dark .tab-list button.active,
+.theme-dark .asrs-result-view-toggle button.active {
+  background: #636366;
+}
+.scared-form-tabs .scared-clear-form {
+  margin-left: 0.4rem;
+  border: 0;
+  color: var(--ios-red);
+  background: transparent;
+}
+.scared-form-tabs .scared-clear-form:hover {
+  color: var(--ios-red);
+  background: color-mix(in srgb, var(--ios-red) 12%, transparent);
+}
+.scared-form-controls button {
+  min-height: 30px;
+  color: var(--ios-tint);
+  background: var(--ios-fill);
+}
+.scared-form-controls button.active {
+  color: #fff;
+  background: var(--ios-tint-fill);
+}
+
+/* ───────────────────────── Sheets (modais) ───────────────────────── */
+.modal-backdrop:not(.patient-edit-page) {
+  /* acima da tab bar (45) e da sidebar móvel (60) */
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: ios-fade-in 0.25s ease;
+}
+.modal-card {
+  border: 0;
+  border-radius: var(--ios-radius-xl);
+  color: var(--ios-label);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-float);
+  animation: ios-sheet-in 0.45s var(--ios-ease);
+}
+.theme-dark .modal-card {
+  background: var(--ios-card);
+}
+.modal-card h2 {
+  color: var(--ios-label);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.modal-close {
+  display: grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 0;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.modal-close:hover {
+  color: var(--ios-label);
+  background: var(--ios-fill-strong);
+}
+.patient-edit-page .patient-form {
+  border: 0;
+  box-shadow: var(--ios-shadow-card);
+  animation: none;
+}
+@keyframes ios-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ios-sheet-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ───────────────────────── Tabelas ───────────────────────── */
+.table-wrap,
+.patients-table-wrap {
+  border: 0;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.data-table,
+.result-table {
+  color: var(--ios-label);
+  font-size: 0.86rem;
+}
+.data-table th,
+.patients-table th,
+.result-table th {
+  border-bottom: 0.5px solid var(--ios-sep);
+  color: var(--ios-label-2);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.data-table td,
+.result-table td {
+  border-bottom: 0.5px solid var(--ios-sep);
+  color: var(--ios-label);
+}
+.data-table th,
+.data-table td {
+  padding: 0.8rem 1rem;
+}
+.patient-table-row:hover td,
+.report-table-row:hover td {
+  background: var(--ios-fill-2);
+}
+.patient-table-row:focus-visible,
+.report-table-row:focus-visible {
+  outline: 2px solid var(--ios-tint);
+}
+.patient-table-row td:last-child::after,
+.report-table-row td:last-child::after {
+  float: right;
+  color: var(--ios-label-3);
+  content: "›";
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.test-badge {
+  padding: 0.25rem 0.55rem;
+  border: 0;
+  color: var(--ios-tint);
+  background: color-mix(in srgb, var(--ios-tint) 12%, transparent);
+  font-weight: 600;
+}
+.table-pagination {
+  color: var(--ios-label-2);
+  font-size: 0.8rem;
+}
+.result-table-wrap,
+.snapiv-results-table {
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.snapiv-results-table .result-table {
+  color: var(--ios-label);
+}
+.snapiv-results-table .result-table th,
+.snapiv-results-table .result-table td {
+  border-bottom-color: var(--ios-sep);
+}
+.snapiv-results-table .result-table th {
+  background: transparent;
+}
+.result-table tr:last-child td,
+.data-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ───────────────────────── Pacientes ───────────────────────── */
+.patients-panel {
+  padding: 1.5rem;
+}
+.patients-search-form {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.patients-search-form label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.patients-search-controls input,
+.search-form input,
+.filter-form input {
+  padding-left: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='m20 20-4.8-4.8'/%3E%3C/svg%3E");
+  background-position: 0.8rem center;
+  background-repeat: no-repeat;
+}
+.patients-search-controls input {
+  width: min(100%, 420px);
+}
+.patients-new-button,
+.patient-form-actions button[type="submit"],
+.patients-search-controls button[type="submit"],
+.patient-action-primary {
+  background: var(--ios-tint-fill);
+}
+.patients-new-button:hover,
+.patient-form-actions button[type="submit"]:hover,
+.patients-search-controls button[type="submit"]:hover,
+.patient-action-primary:hover {
+  background: color-mix(in srgb, var(--ios-tint-fill) 88%, #000);
+}
+.patient-detail-panel {
+  padding: 0;
+}
+.patient-page-heading {
+  gap: 1.2rem;
+  padding: 2rem;
+  border-bottom: 0.5px solid var(--ios-sep);
+  background:
+    radial-gradient(80% 140% at 0% 0%, color-mix(in srgb, var(--ios-tint) 14%, transparent), transparent 70%),
+    var(--ios-card);
+}
+.patient-page-avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(180deg, #a5a5ad, #85858c);
+  font-family: var(--ios-font-rounded);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.patient-page-identity h2 {
+  font-weight: 700;
+}
+.patient-page-identity p {
+  color: var(--ios-label-2);
+}
+/* Grade de dados vira lista agrupada com separadores */
+.patient-page .patient-readonly-grid,
+.patient-readonly-grid {
+  gap: 0;
+  overflow: hidden;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.patient-page .patient-readonly-grid div,
+.patient-readonly-grid div {
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-bottom: 0.5px solid var(--ios-sep);
+  border-radius: 0;
+  background: transparent;
+}
+.patient-readonly-grid dt,
+.patient-page .patient-readonly-grid dt {
+  color: var(--ios-label-2);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.patient-readonly-grid dd,
+.patient-page .patient-readonly-grid dd {
+  color: var(--ios-label);
+  font-size: 0.92rem;
+}
+.patient-notes {
+  border: 0;
+  border-radius: var(--ios-radius);
+  color: var(--ios-label);
+  background: var(--ios-card-2);
+}
+.notes-audit {
+  color: var(--ios-label-2);
+}
+.patient-extra-fields summary {
+  color: var(--ios-tint);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.patient-form-heading p,
+.patients-heading-note {
+  color: var(--ios-label-2);
+}
+.patient-primary-fields label > span,
+.report-create-modal label,
+.report-create-modal h2 {
+  color: var(--ios-label);
+}
+.required-mark,
+.report-create-modal label > span b {
+  color: var(--ios-red);
+}
+.report-create-divider {
+  color: var(--ios-label-2);
+}
+.report-create-divider::before,
+.report-create-divider::after {
+  height: 0.5px;
+  background: var(--ios-sep);
+}
+
+/* ───────────────────────── Testes da plataforma ───────────────────────── */
+.platform-tests-heading p,
+.platform-test-hero p,
+.platform-test-card p,
+.platform-test-main p {
+  color: var(--ios-label-2);
+}
+.platform-tests-heading h2,
+.platform-test-card h3,
+.platform-test-hero h2,
+.platform-test-main h2,
+.platform-test-main h3 {
+  color: var(--ios-label);
+  font-weight: 700;
+}
+.platform-tests-count,
+.platform-test-category,
+.platform-use-badge {
+  color: var(--ios-tint);
+  background: color-mix(in srgb, var(--ios-tint) 12%, transparent);
+  font-weight: 600;
+}
+.platform-test-card {
+  padding: 1.3rem;
+  transition:
+    transform 0.25s var(--ios-ease),
+    box-shadow 0.25s ease;
+}
+.platform-test-card:hover {
+  box-shadow: var(--ios-shadow-float);
+  transform: translateY(-2px);
+}
+.platform-test-icon,
+.platform-test-hero-mark {
+  color: #fff;
+  background: linear-gradient(160deg, #7a78f0, #5856d6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  font-family: var(--ios-font-rounded);
+  font-weight: 700;
+}
+.platform-test-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 22.5%;
+}
+.platform-test-hero-mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 22.5%;
+}
+.platform-test-tags span,
+.platform-domain-list span {
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+  font-weight: 500;
+}
+.platform-test-card-footer {
+  border-top: 0.5px solid var(--ios-sep);
+  color: var(--ios-tint);
+  font-weight: 600;
+}
+.platform-test-card-footer > span {
+  color: var(--ios-label-2);
+}
+.platform-test-hero {
+  border: 0;
+  background:
+    radial-gradient(80% 140% at 0% 0%, color-mix(in srgb, var(--ios-indigo) 16%, transparent), transparent 70%),
+    var(--ios-card);
+}
+.platform-summary div {
+  border-bottom: 0.5px solid var(--ios-sep);
+}
+.platform-summary dt {
+  color: var(--ios-label-2);
+  font-size: 0.82rem;
+}
+.platform-summary dd {
+  color: var(--ios-label);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.platform-steps li {
+  border: 0;
+  border-radius: var(--ios-radius);
+  color: var(--ios-label-2);
+  background: var(--ios-card-2);
+}
+.platform-steps li::before {
+  color: #fff;
+  background: var(--ios-tint-fill);
+  font-family: var(--ios-font-rounded);
+  font-weight: 700;
+}
+.platform-steps strong,
+.platform-observation-grid strong {
+  color: var(--ios-label);
+}
+.platform-observation-grid div {
+  border: 0;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.platform-observation-grid span,
+.platform-checklist {
+  color: var(--ios-label-2);
+}
+.platform-reference-card a,
+.snapiv-results-source a {
+  color: var(--ios-tint);
+}
+.platform-reference-card a:hover {
+  color: var(--ios-tint);
+}
+
+/* ───────────────────────── Editor de laudo ───────────────────────── */
+.report-outline {
+  gap: 2px;
+  padding: 0.4rem;
+}
+.report-outline > button,
+.report-outline-tests .outline-application {
+  min-height: 40px;
+  border-radius: var(--ios-radius-sm);
+  color: var(--ios-label);
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+.report-outline > button:hover,
+.report-outline-tests .outline-application:hover {
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+.report-outline > button.active,
+.report-outline-tests .outline-application.active {
+  color: #fff;
+  background: var(--ios-tint-fill);
+}
+.report-outline-tests .outline-application small {
+  color: var(--ios-label-2);
+}
+.report-outline-tests .outline-application.active small {
+  color: rgba(255, 255, 255, 0.8);
+}
+.report-outline-tests {
+  border-top: 0.5px solid var(--ios-sep);
+}
+.referral-suggestions input {
+  border-color: transparent;
+}
+.referral-suggestions input:focus {
+  border-color: transparent;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ios-tint) 40%, transparent);
+}
+
+/* Menu de exportação como menu de contexto do iOS */
+.report-export-menu summary {
+  min-height: 36px;
+  padding: 0.55rem 1.05rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--ios-tint-fill);
+  box-shadow: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.report-export-menu summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ios-tint) 45%, transparent);
+}
+.report-export-menu > div {
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0.5px solid var(--ios-glass-border);
+  border-radius: var(--ios-radius);
+  background: var(--ios-glass-strong);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  box-shadow: var(--ios-shadow-float);
+  animation: ios-menu-in 0.3s var(--ios-ease);
+  transform-origin: top right;
+}
+.report-export-menu-label {
+  padding: 0.65rem 1rem 0.45rem;
+  color: var(--ios-label-2);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.report-export-menu > div button {
+  min-height: 48px;
+  padding: 0.6rem 1rem;
+  border-top: 0.5px solid var(--ios-sep);
+  border-radius: 0;
+  color: var(--ios-label);
+  background: transparent;
+}
+.report-export-menu > div button:hover {
+  background: var(--ios-fill-2);
+}
+.report-export-menu > div button strong {
+  color: var(--ios-label);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+.report-export-menu > div button small {
+  color: var(--ios-label-2);
+  font-weight: 400;
+}
+@keyframes ios-menu-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+.report-export-modal > h2,
+.report-export-grid h3,
+.report-export-option strong {
+  color: var(--ios-label);
+}
+.report-export-grid p {
+  color: var(--ios-label-2);
+}
+.report-export-grid > section + section {
+  border-left: 0.5px solid var(--ios-sep);
+}
+.report-export-options {
+  overflow: hidden;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.report-export-option {
+  min-height: 48px;
+  border-bottom: 0.5px solid var(--ios-sep);
+  color: var(--ios-label);
+}
+.report-export-option:last-child {
+  border-bottom: 0;
+}
+.report-export-option label {
+  gap: 0.45rem;
+  color: var(--ios-label);
+  font-size: 0.82rem;
+}
+.report-export-option input[type="radio"] {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+}
+
+/* ───────────────────────── Formulários dos instrumentos ───────────────────────── */
+.form-sections > div {
+  border: 0;
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.form-sections h3 {
+  color: var(--ios-label);
+  font-weight: 600;
+}
+.instrument-field {
+  color: var(--ios-label);
+  font-weight: 500;
+}
+.asrs-form-sections > div,
+.snapiv-form-sections > div,
+.scared-form-sections > div {
+  border: 0;
+  background: var(--ios-card-2);
+}
+.asrs-form-sections h3,
+.snapiv-form-sections h3,
+.scared-form-sections h3 {
+  border-bottom: 0.5px solid var(--ios-sep);
+  color: var(--ios-label);
+  background: transparent;
+  font-size: 0.95rem;
+}
+.asrs-choice-header,
+.snapiv-choice-header,
+.scared-choice-header {
+  border-bottom: 0.5px solid var(--ios-sep);
+  color: var(--ios-label-2);
+  background: var(--ios-card-3);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.asrs-choice-header span,
+.snapiv-choice-header span,
+.scared-choice-header span {
+  border-right: 0.5px solid var(--ios-sep);
+}
+.asrs-form-sections .instrument-field,
+.snapiv-form-sections .instrument-field,
+.scared-form-sections .instrument-field {
+  border-bottom: 0.5px solid var(--ios-sep);
+  font-size: 0.86rem;
+  transition: background-color 0.15s ease;
+}
+.asrs-form-sections .instrument-field:hover,
+.snapiv-form-sections .instrument-field:hover,
+.scared-form-sections .instrument-field:hover {
+  background: var(--ios-fill-2);
+}
+.asrs-choice-list,
+.snapiv-choice-list,
+.scared-choice-list {
+  border-left: 0.5px solid var(--ios-sep);
+}
+.asrs-choice-list label,
+.snapiv-choice-list label,
+.scared-choice-list label {
+  border-right: 0.5px solid var(--ios-sep);
+}
+.asrs-choice-list label:last-child,
+.snapiv-choice-list label:last-child,
+.scared-choice-list label:last-child {
+  border-right: 0;
+}
+.snapiv-add-respondent button {
+  color: var(--ios-tint);
+  background: var(--ios-fill);
+}
+
+/* ───────────────────────── Gráficos ───────────────────────── */
+.asrs-chart {
+  background: var(--ios-card-2);
+  box-shadow: none;
+}
+.asrs-chart-heading {
+  color: var(--ios-label);
+}
+.asrs-chart-heading span {
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--ios-orange) 80%, var(--ios-label));
+  background: color-mix(in srgb, var(--ios-orange) 16%, transparent);
+  font-weight: 600;
+}
+.asrs-chart-scale,
+.snapiv-chart-axis {
+  color: var(--ios-label-2);
+}
+/* Mesma geometria da faixa e das linhas de grade de styles.css; apenas cores. */
+.asrs-chart-bars {
+  border-bottom: 1px solid var(--ios-sep-strong);
+  background-image:
+    linear-gradient(to top, color-mix(in srgb, var(--ios-orange) 16%, transparent) 0 44.44%, transparent 44.44%),
+    repeating-linear-gradient(to top, transparent 0 calc(11.11% - 1px), var(--ios-sep) calc(11.11% - 1px) 11.11%);
+}
+.asrs-chart-score {
+  color: var(--ios-tint);
+  font-family: var(--ios-font-rounded);
+}
+.asrs-chart-bar {
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ios-tint) 70%, #fff), var(--ios-tint));
+  box-shadow: none;
+}
+.asrs-chart-bar-group strong,
+.snapiv-chart-bar strong,
+.snapiv-chart-column > strong,
+.snapiv-chart-legend,
+.snapiv-results-caption,
+.snapiv-results-chart h3 {
+  color: var(--ios-label);
+}
+.snapiv-results-source {
+  color: var(--ios-label-2);
+}
+.snapiv-chart-bars {
+  border-bottom: 1px solid var(--ios-sep-strong);
+}
+.snapiv-chart-bars::before {
+  background: repeating-linear-gradient(to top, var(--ios-sep) 0 1px, transparent 1px calc(100% / 27));
+}
+.snapiv-chart-bar {
+  border-radius: 6px 6px 0 0;
+}
+.snapiv-chart-key {
+  border-radius: 3px;
+}
+/* Cores de faixa mantêm o mesmo significado (sem sintoma → grave), na paleta do iOS. */
+.snapiv-chart-key.none,
+.snapiv-chart-bar.none { background: var(--ios-green); }
+.snapiv-chart-key.mild,
+.snapiv-chart-bar.mild { background: var(--ios-yellow); }
+.snapiv-chart-key.moderate,
+.snapiv-chart-bar.moderate { background: var(--ios-orange); }
+.snapiv-chart-key.severe,
+.snapiv-chart-bar.severe { background: var(--ios-red); }
+.snapiv-chart-bar.unknown { background: var(--ios-teal); }
+
+/* ───────────────────────── Tab bar (telas pequenas) ───────────────────────── */
+.ios-tabbar {
+  display: none;
+}
+@media (max-width: 900px) {
+  .dashboard-shell,
+  .dashboard-shell.sidebar-is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    z-index: 60;
+    width: min(300px, 86vw);
+    padding-top: max(1.1rem, env(safe-area-inset-top));
+    background: var(--ios-bg);
+    box-shadow: var(--ios-shadow-float);
+    transition: transform 0.4s var(--ios-ease);
+  }
+  .sidebar-close {
+    display: grid;
+  }
+  .sidebar-scrim {
+    position: fixed;
+    z-index: 55;
+    inset: 0;
+    display: block;
+    background: rgba(0, 0, 0, 0.32);
+    animation: ios-fade-in 0.25s ease;
+  }
+  .sidebar-is-collapsed .sidebar-nav a,
+  .sidebar-is-collapsed .sidebar-logout {
+    justify-content: flex-start;
+    padding-inline: 0.6rem;
+  }
+  .sidebar-is-collapsed .sidebar-nav a.active,
+  .sidebar-is-collapsed .sidebar-nav a[aria-current="page"] {
+    background: var(--ios-tint-fill);
+  }
+  .sidebar-is-collapsed .sidebar-context {
+    background: var(--ios-card);
+  }
+  .dashboard-main {
+    padding: 0 1rem calc(6.5rem + env(safe-area-inset-bottom));
+  }
+  .topbar {
+    position: static;
+    margin: 0 -1rem 1rem;
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 0.8rem;
+    border-bottom: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .topbar h1 {
+    font-size: 2.1rem;
+  }
+  .ios-tabbar {
+    position: fixed;
+    z-index: 45;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 6px;
+    border: 0.5px solid var(--ios-glass-border);
+    border-radius: 999px;
+    background: var(--ios-glass);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: var(--ios-shadow-float);
+  }
+  .ios-tabbar a {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-height: 50px;
+    align-content: center;
+    padding: 4px 2px;
+    border-radius: 999px;
+    color: var(--ios-label-2);
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease, background-color 0.2s ease;
+  }
+  .ios-tabbar a.active,
+  .ios-tabbar a[aria-current="page"] {
+    color: var(--ios-tint);
+    background: var(--ios-fill);
+  }
+  .snackbar {
+    bottom: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  /* minmax(0, …) impede que tabelas largas estiquem a página além da tela */
+  .content-grid,
+  .content-grid-single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel {
+    min-width: 0;
+  }
+  .panel,
+  .patients-panel {
+    padding: 1.1rem;
+  }
+  /* Linha superior: menu à esquerda, ações à direita; título grande abaixo */
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 0.6rem;
+  }
+  .topbar > .mobile-menu {
+    order: 0;
+  }
+  .topbar > .header-actions {
+    order: 1;
+    margin-left: auto;
+  }
+  .topbar > div:nth-child(2) {
+    order: 2;
+    flex: 1 1 100%;
+  }
+  .patients-search-controls {
+    flex-wrap: nowrap;
+  }
+  .patients-search-controls input {
+    flex: 1 1 auto;
+    flex-basis: auto;
+    width: auto;
+  }
+  .patients-search-controls button {
+    flex: 0 0 auto;
+  }
+  .overview-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  .overview-stats article {
+    padding: 0.9rem;
+  }
+  .overview-stats strong {
+    font-size: 1.6rem;
+  }
+  .theme-toggle > span {
+    display: none;
+  }
+  .theme-toggle {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+  .profile-chip {
+    padding-right: 0.25rem;
+  }
+  .profile-chip > span:last-child {
+    display: none;
+  }
+  .report-export-grid > section + section {
+    border-top: 0.5px solid var(--ios-sep);
+    border-left: 0;
+  }
+  .patient-page-heading {
+    padding: 1.25rem;
+  }
+  /* Modais viram sheets que sobem da borda inferior */
+  .modal-backdrop:not(.patient-edit-page) {
+    align-items: end;
+    padding: 0;
+  }
+  .modal-backdrop:not(.patient-edit-page) .modal-card {
+    width: 100%;
+    max-height: 92dvh;
+    padding-top: 1.9rem;
+    padding-bottom: max(1.4rem, env(safe-area-inset-bottom));
+    border-radius: var(--ios-radius-xl) var(--ios-radius-xl) 0 0;
+    animation: ios-sheet-up 0.5s var(--ios-ease);
+  }
+  .modal-backdrop:not(.patient-edit-page) .modal-card::before {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 38px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--ios-fill-strong);
+    content: "";
+    transform: translateX(-50%);
+  }
+  .asrs-choice-list,
+  .snapiv-choice-list,
+  .scared-choice-list {
+    border-top: 0.5px solid var(--ios-sep);
+    border-left: 0;
+  }
+  .asrs-choice-list label,
+  .snapiv-choice-list label,
+  .scared-choice-list label {
+    min-height: 48px;
+  }
+}
+@keyframes ios-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ───────────────────────── Acessibilidade ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .topbar,
+  .snackbar,
+  .auth-card,
+  .ios-tabbar,
+  .report-export-menu > div {
+    background: var(--ios-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ───────────────────────── Ajustes de compatibilidade ─────────────────────────
+ * Regras genéricas acima (button, input, ul, li) vencem variantes da camada base;
+ * aqui restauramos o que essas variantes precisam manter.
+ */
+.patient-row,
+.patient-row:hover {
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+.patient-row:active:not(:disabled) {
+  transform: none;
+}
+.platform-steps {
+  gap: 0.6rem;
+}
+.platform-steps li {
+  padding: 0.8rem 0.9rem 0.8rem 3.4rem;
+}
+.platform-checklist {
+  gap: 0.5rem;
+}
+.platform-checklist li {
+  display: list-item;
+  padding: 0;
+  list-style: disc;
+}
+.platform-checklist li::marker {
+  color: var(--ios-tint);
+}
+.notes-audit ul {
+  gap: 0.35rem;
+}
+.notes-audit li {
+  padding: 0.2rem 0;
+}
+select[multiple] {
+  min-height: 96px;
+  padding: 0.35rem;
+}
+.report-outline-tests button {
+  font-size: 0.8rem;
+}
+.report-outline-tests .outline-application {
+  display: grid;
+  text-align: left;
+}
+.snapiv-add-respondent input {
+  min-height: 36px;
+}
+@media (max-width: 900px) {
+  .sidebar-toggle {
+    display: none;
+  }
+}
+@media (max-width: 800px) {
+  .auth-intro .brand-lockup {
+    justify-content: center;
+  }
+  .auth-points span {
+    margin-inline: auto;
+  }
+  .auth-card {
+    padding: 1.6rem;
+  }
+}
+/* Card de navegação com altura do conteúdo; rodapé encostado embaixo */
+.sidebar-nav {
+  flex: 0 0 auto;
+}
+.sidebar-footer {
+  margin-top: auto;
+}
+.platform-test-card-footer button,
+.panel-actions button,
+.evaluation-actions button {
+  white-space: nowrap;
+}

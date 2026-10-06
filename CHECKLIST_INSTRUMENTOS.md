@@ -6,13 +6,13 @@ Um cadastro no catálogo não significa que a aplicação digital ou a correçã
 
 ## Fila de trabalho
 
-Marcar como concluído somente após cumprir os critérios de liberação deste documento.
+Marcar como concluído somente após cumprir os critérios de liberação deste documento. `[~]` indica implementação parcial no projeto, ainda sem liberação clínica.
 
-- [ ] 01. ASRS-18 — revisar a configuração existente.
+- [~] 01. ASRS-18 — configuração, formulário e laudo existentes; revisar versão, correção e validação profissional.
 - [~] 02. SNAP-IV — formulário de 26 itens configurado com informante pais/responsáveis ou professor(a); somas por domínio disponíveis, aguardando conferência profissional da versão e critérios de interpretação.
-- [ ] 03. SCARED — crianças/adolescentes.
-- [ ] 04. SCARED — pais.
-- [~] 05. BAI — edição identificada como BAI-2023-BR; aguardando manual, licença e validação profissional.
+- [~] 03. SCARED-C — formulário, pontuação e laudo existentes; tradução em português e uso clínico aguardam validação profissional.
+- [~] 04. SCARED-P — formulário, pontuação e laudo existentes; versão em português e uso clínico aguardam validação profissional.
+- [~] 05. BAI — formulário, escore bruto e laudo factual existentes na configuração Cunha 2001; conciliar com a identificação BAI-2023-BR da ficha e conferir manual, licença e validação profissional.
 - [ ] 06. BDI — confirmar edição, incluindo se será BDI-II.
 - [ ] 07. CDI — confirmar edição.
 - [ ] 08. MASC — confirmar edição.
@@ -118,6 +118,6 @@ A aprovação de um instrumento não conclui a preparação operacional. Seguran
 
 ## Atualização
 
-- Usar `[ ]` para pendente e `[x]` apenas para concluído com evidência.
+- Usar `[ ]` para não iniciado, `[~]` para implementação parcial sem liberação clínica e `[x]` apenas para concluído com evidência.
 - Registrar bloqueios indicando o material ou a decisão que falta.
 - Ao concluir um instrumento, atualizar a fila e o registro de conclusão antes de iniciar o próximo.

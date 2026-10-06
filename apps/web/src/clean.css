@@ -1,0 +1,618 @@
+/*
+ * Tema "clean": superfícies sólidas, bordas finas, um único destaque (azul),
+ * sem gradientes nem brilhos. Modos claro e escuro.
+ * Carregado depois de ios.css e tem precedência sobre ele.
+ */
+
+/* ───────────────────────── Tokens ───────────────────────── */
+:root {
+  --ios-font: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "Segoe UI", Roboto, system-ui, sans-serif;
+
+  --ios-bg: #f5f5f7;
+  --ios-card: #ffffff;
+  --ios-card-2: #f7f7f9;
+  --ios-card-3: #efeff2;
+  --ios-border: rgba(0, 0, 0, 0.07);
+
+  /* texto/ícones (--ios-tint) e fundo de botão com texto branco (--ios-tint-fill), ambos AA */
+  --ios-tint: #0066d6;
+  --ios-tint-fill: #0066d6;
+  --ios-tint-bright: #007aff;
+  --ios-tint-soft: rgba(0, 102, 214, 0.09);
+
+  --ios-glass: rgba(245, 245, 247, 0.86);
+  --ios-glass-strong: #ffffff;
+  --ios-glass-border: var(--ios-border);
+  --ios-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --ios-shadow-float: 0 16px 40px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
+  --ios-radius-lg: 16px;
+  --ios-radius-xl: 20px;
+}
+.theme-dark,
+html.theme-dark-root {
+  --ios-bg: #000000;
+  --ios-card: #1c1c1e;
+  --ios-card-2: #242427;
+  --ios-card-3: #2c2c2e;
+  --ios-border: rgba(255, 255, 255, 0.08);
+
+  --ios-tint: #0a84ff;
+  --ios-tint-fill: #0071e3;
+  --ios-tint-bright: #0a84ff;
+  --ios-tint-soft: rgba(10, 132, 255, 0.14);
+
+  --ios-glass: rgba(0, 0, 0, 0.82);
+  --ios-glass-strong: #1c1c1e;
+  --ios-glass-border: var(--ios-border);
+  --ios-shadow-card: none;
+  --ios-shadow-float: 0 18px 48px rgba(0, 0, 0, 0.65);
+}
+
+body {
+  font-size: 15px;
+  letter-spacing: -0.006em;
+}
+.overview-stats strong,
+.data-table,
+.result-table,
+.panel-count {
+  font-variant-numeric: tabular-nums;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ios-fill-strong) transparent;
+}
+
+/* ───────────────────────── Superfícies ───────────────────────── */
+.panel,
+.overview-stats article,
+.platform-test-card,
+.report-outline,
+.modal-card,
+.theme-dark .modal-card {
+  border: 1px solid var(--ios-border);
+  background: var(--ios-card);
+  box-shadow: var(--ios-shadow-card);
+}
+.panel {
+  border-radius: var(--ios-radius-lg);
+}
+.modal-card {
+  box-shadow: var(--ios-shadow-float);
+}
+.modal-backdrop:not(.patient-edit-page) {
+  background: rgba(0, 0, 0, 0.36);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.platform-test-hero,
+.patient-page-heading {
+  background: var(--ios-card);
+}
+.platform-test-card:hover {
+  border-color: color-mix(in srgb, var(--ios-label) 14%, transparent);
+  box-shadow: var(--ios-shadow-card);
+  transform: none;
+}
+
+/* ───────────────────────── Sidebar ───────────────────────── */
+.dashboard-shell {
+  grid-template-columns: 252px minmax(0, 1fr);
+  background: var(--ios-bg);
+}
+.sidebar {
+  gap: 1.1rem;
+  padding: 1.1rem 0.75rem;
+  border-right: 1px solid var(--ios-border);
+  background: var(--ios-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Símbolo (SVG em brand.tsx): a cor da folha vem de currentColor */
+.brand-mark {
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+  border-radius: 0;
+  color: var(--ios-tint-fill);
+  background: none;
+  box-shadow: none;
+}
+.brand-mark::after {
+  display: none;
+}
+.sidebar-brand .brand-mark,
+.brand-lockup .brand-mark {
+  width: auto;
+  height: auto;
+}
+.sidebar-brand strong,
+.brand-lockup strong {
+  letter-spacing: -0.025em;
+}
+.sidebar-toggle {
+  color: var(--ios-label-2);
+}
+.sidebar-context {
+  border: 1px solid var(--ios-border);
+  border-radius: 12px;
+  background: var(--ios-card);
+  box-shadow: none;
+}
+.sidebar-nav {
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.sidebar-nav a,
+.sidebar-logout {
+  min-height: 40px;
+  gap: 0.7rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  color: var(--ios-label-2);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.sidebar-nav a:hover,
+.sidebar-logout:hover {
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+.sidebar-nav a.active,
+.sidebar-nav a[aria-current="page"],
+.sidebar-is-collapsed .sidebar-nav a.active,
+.sidebar-is-collapsed .sidebar-nav a[aria-current="page"] {
+  color: var(--ios-label);
+  background: var(--ios-fill);
+  box-shadow: none;
+  font-weight: 600;
+}
+.sidebar-nav-icon,
+.sidebar-nav a.active .sidebar-nav-icon,
+.sidebar-nav a[aria-current="page"] .sidebar-nav-icon {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 0;
+  color: inherit;
+  background: none;
+  box-shadow: none;
+}
+.sidebar-nav a.active .sidebar-nav-icon,
+.sidebar-nav a[aria-current="page"] .sidebar-nav-icon {
+  color: var(--ios-tint);
+}
+.sidebar-footer {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ios-border);
+}
+.sidebar-logout,
+.sidebar-logout:hover {
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+}
+.sidebar-logout:hover {
+  color: var(--ios-red);
+  background: color-mix(in srgb, var(--ios-red) 8%, transparent);
+}
+
+/* ───────────────────────── Barra superior ───────────────────────── */
+.dashboard-main {
+  padding: 0 2rem 3rem;
+}
+/* Barra fixa com vidro fosco: o conteúdo aparece desfocado ao rolar por baixo. */
+.topbar {
+  margin: 0 -2rem 1.5rem;
+  padding: 1.5rem 2rem 1.1rem;
+  border-bottom: 1px solid var(--ios-border);
+  background: color-mix(in srgb, var(--ios-bg) 66%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+/* Índice do editor: fixa logo abaixo da barra superior e rola por dentro se for longo. */
+.report-outline {
+  top: calc(var(--topbar-height, 0px) + 1rem);
+  max-height: calc(100vh - var(--topbar-height, 0px) - 2rem);
+  max-height: calc(100dvh - var(--topbar-height, 0px) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.topbar h1 {
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.topbar .eyebrow {
+  color: var(--ios-label-2);
+}
+.topbar .eyebrow::first-letter {
+  text-transform: uppercase;
+}
+.header-actions {
+  gap: 0.5rem;
+}
+.theme-toggle {
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+.theme-toggle:hover {
+  background: var(--ios-fill);
+}
+.profile-chip {
+  background: transparent;
+}
+.profile-chip:hover {
+  background: var(--ios-fill-2);
+}
+.topbar-logout,
+button.secondary.topbar-logout {
+  color: var(--ios-label);
+}
+.avatar,
+.list-avatar,
+.data-list li .list-avatar,
+.patient-page-avatar {
+  color: var(--ios-label-2);
+  background: var(--ios-fill);
+  box-shadow: none;
+  font-family: var(--ios-font);
+  font-weight: 600;
+}
+.mobile-menu {
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+
+/* ───────────────────────── Botões ───────────────────────── */
+button {
+  font-weight: 600;
+}
+button:active:not(:disabled) {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+button.secondary {
+  color: var(--ios-label);
+  background: var(--ios-fill-2);
+}
+button.secondary:hover {
+  background: var(--ios-fill);
+}
+.report-export-menu summary {
+  background: var(--ios-tint-fill);
+}
+
+/* ───────────────────────── Campos ───────────────────────── */
+input,
+select,
+textarea {
+  border: 1px solid var(--ios-border);
+  background-color: var(--ios-card);
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: color-mix(in srgb, var(--ios-label) 16%, transparent);
+  background-color: var(--ios-card);
+}
+input:focus,
+select:focus,
+textarea:focus,
+.theme-dark input:focus,
+.theme-dark select:focus,
+.theme-dark textarea:focus {
+  border-color: var(--ios-tint);
+  background-color: var(--ios-card);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ios-tint) 20%, transparent);
+}
+input[type="radio"],
+input[type="checkbox"] {
+  background-color: transparent;
+}
+.patients-search-controls input,
+.search-form input,
+.filter-form input {
+  background-color: var(--ios-card);
+}
+
+/* ───────────────────────── Indicadores ───────────────────────── */
+.overview-stats article {
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
+}
+.overview-stats strong {
+  font-family: var(--ios-font);
+  font-size: 2rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.stat-icon,
+.stat-icon.orange,
+.stat-icon.blue,
+.stat-icon.green {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--ios-tint);
+  background: var(--ios-tint-soft);
+  box-shadow: none;
+}
+.platform-test-icon,
+.platform-test-hero-mark {
+  color: var(--ios-tint);
+  background: var(--ios-tint-soft);
+  box-shadow: none;
+  font-family: var(--ios-font);
+  font-weight: 700;
+}
+.platform-test-icon {
+  border-radius: 10px;
+}
+.platform-test-hero-mark {
+  border-radius: 16px;
+}
+.platform-tests-count,
+.platform-test-category,
+.platform-use-badge,
+.test-badge {
+  color: var(--ios-tint);
+  background: var(--ios-tint-soft);
+}
+.status::before {
+  display: none;
+}
+.platform-steps li::before {
+  color: var(--ios-tint);
+  background: var(--ios-tint-soft);
+}
+.report-outline > button.active,
+.report-outline-tests .outline-application.active {
+  color: var(--ios-label);
+  background: var(--ios-fill);
+  font-weight: 600;
+}
+.report-outline-tests .outline-application.active small {
+  color: var(--ios-label-2);
+}
+.patient-table-row td:last-child::after,
+.report-table-row td:last-child::after {
+  color: var(--ios-label-3);
+}
+
+/* ───────────────────────── Avisos e menus ───────────────────────── */
+.snackbar {
+  border: 1px solid var(--ios-border);
+  border-radius: 14px;
+  background: var(--ios-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--ios-shadow-float);
+}
+.snackbar::after {
+  background: var(--ios-tint);
+  opacity: 0.35;
+}
+.snackbar-icon {
+  border-radius: 50%;
+  color: var(--ios-tint);
+  background: var(--ios-tint-soft);
+}
+.report-export-menu > div {
+  border: 1px solid var(--ios-border);
+  background: var(--ios-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ───────────────────────── Login ───────────────────────── */
+.auth-shell,
+html.theme-dark-root .auth-shell {
+  background: var(--ios-bg);
+}
+.auth-shell::before {
+  display: none;
+}
+.auth-kicker {
+  border: 1px solid var(--ios-border);
+  color: var(--ios-label-2);
+  background: var(--ios-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.auth-intro h1 {
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+.auth-points span {
+  padding: 0;
+  border: 0;
+  color: var(--ios-label-2);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.auth-points span::first-letter {
+  color: var(--ios-tint);
+}
+.auth-card {
+  border: 1px solid var(--ios-border);
+  border-radius: 20px;
+  background: var(--ios-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--ios-shadow-float);
+}
+.auth-card input,
+.auth-card input:focus {
+  background: var(--ios-card);
+}
+.auth-card button[type="submit"] {
+  border-radius: 12px;
+}
+
+/* ───────────────────────── Configurações > Aparência ───────────────────────── */
+.settings-page {
+  display: grid;
+  gap: 1.2rem;
+  width: 100%;
+}
+.appearance-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+/* O título do cartão já diz "Aparência"; a legenda fica só para leitores de tela. */
+.appearance-group legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.appearance-modes {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--ios-fill);
+}
+.appearance-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 120px;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  color: var(--ios-label-2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.appearance-mode.is-selected {
+  color: var(--ios-label);
+  background: var(--ios-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  font-weight: 600;
+}
+.theme-dark .appearance-mode.is-selected {
+  background: #48484a;
+}
+.appearance-mode input {
+  position: absolute;
+  width: 1px;
+  min-width: 0;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  opacity: 0;
+}
+.appearance-mode:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--ios-tint) 50%, transparent);
+  outline-offset: 2px;
+}
+
+/* ───────────────────────── Telas pequenas ───────────────────────── */
+@media (max-width: 900px) {
+  .dashboard-shell,
+  .dashboard-shell.sidebar-is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    background: var(--ios-bg);
+    border-right: 1px solid var(--ios-border);
+  }
+  .dashboard-main {
+    padding: 0 1rem calc(5rem + env(safe-area-inset-bottom));
+  }
+  .topbar {
+    margin: 0 -1rem 1rem;
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 0.9rem;
+    border-bottom: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Aqui a barra superior não é fixa (rola com a página) */
+  .report-outline {
+    top: 1rem;
+    max-height: calc(100dvh - 2rem);
+  }
+  /* Tab bar encaixada na base, como no iPhone */
+  .ios-tabbar {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    max-width: none;
+    padding: 4px 6px max(6px, env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--ios-border);
+    border-radius: 0;
+    background: var(--ios-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: none;
+  }
+  .ios-tabbar a {
+    min-height: 48px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .ios-tabbar a.active,
+  .ios-tabbar a[aria-current="page"] {
+    color: var(--ios-tint);
+    background: transparent;
+    box-shadow: none;
+  }
+}
+@media (max-width: 680px) {
+  .overview-stats strong {
+    font-size: 1.6rem;
+  }
+}
+
+/* ───────────────────────── Formulários: cabeçalho das alternativas fixo ─────────────────────────
+ * Em questionários longos, a linha "Nunca / Raramente / …" acompanha a rolagem e
+ * para logo abaixo da barra superior. O contêiner não pode ter overflow: hidden,
+ * senão o position: sticky deixa de funcionar.
+ */
+.asrs-form-sections > div,
+.snapiv-form-sections > div,
+.scared-form-sections > div {
+  overflow: visible;
+}
+.asrs-choice-header,
+.snapiv-choice-header,
+.scared-choice-header {
+  position: sticky;
+  z-index: 5;
+  top: var(--topbar-height, 0px);
+  background: var(--ios-card-3);
+  box-shadow: 0 1px 0 var(--ios-sep);
+}
+@media (max-width: 900px) {
+  /* A barra superior rola junto com a página nessa largura */
+  .asrs-choice-header,
+  .snapiv-choice-header,
+  .scared-choice-header {
+    top: 0;
+  }
+}

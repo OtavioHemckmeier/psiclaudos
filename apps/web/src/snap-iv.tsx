@@ -26,7 +26,7 @@ export function SnapIvCard({ onOpen }: { onOpen: () => void }) {
 export function SnapIvPage({ onBack }: { onBack: () => void }) {
   return (
     <section className="platform-test-page">
-      <button className="back-link" onClick={onBack}>← Voltar para testes da plataforma</button>
+      <button className="back-link" onClick={onBack}>Voltar para testes da plataforma</button>
       <article className="panel platform-test-hero">
         <div className="platform-test-hero-mark">SN</div>
         <div>
