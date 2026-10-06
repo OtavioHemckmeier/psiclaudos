@@ -422,7 +422,11 @@ export class ReportsService {
 
       const hasCoverPage = Boolean(snapshot.exportOptions.chapters.coverPage);
       document.on("pageAdded", () => {
+        // Quebra automática no meio de um texto: o cabeçalho troca fonte e cor
+        // (a marca é desenhada em azul). Restaura o estado para o texto continuar igual.
+        const textState = this.captureTextState(document);
         this.renderPageHeader(document, snapshot.professional);
+        this.restoreTextState(document, textState);
       });
 
       if (snapshot.exportOptions.chapters.coverPage) {
@@ -468,6 +472,8 @@ export class ReportsService {
       if (snapshot.exportOptions.chapters.anamnesis) {
         document.moveDown().font("Helvetica-Bold").fontSize(13).fillColor("#111111").text("4. Análise dos resultados:");
         document.moveDown(0.7).font("Helvetica-Bold").fontSize(12).text("4.1. Anamnese");
+        if (!this.hasAnamnesis(anamnesis))
+          document.moveDown(0.35).font("Helvetica").fontSize(10).fillColor("#222222").text("Não informada.");
         this.renderTextSection(document, "4.1.1. História pessoal e desenvolvimento", this.displayValue(anamnesis.personalHistory));
         this.renderTextSection(document, "4.1.2. Contexto familiar e relacional", this.displayValue(anamnesis.familyContext));
         this.renderTextSection(document, "4.1.3. Histórico médico e psiquiátrico", this.displayValue(anamnesis.medicalHistory));
@@ -535,7 +541,7 @@ export class ReportsService {
       if (snapshot.exportOptions.chapters.references)
         this.renderTextSection(document, "7. Referências bibliográficas", instrumentReportReferences(snapshot.applications.map((application) => this.reportContentFor(application))));
       if (snapshot.exportOptions.chapters.deliveryTerm)
-        this.renderTextSection(document, "8. Termo de entrega", this.deliveryTermText(snapshot.professional?.name));
+        this.renderTextSection(document, "8. Termo de entrega", this.deliveryTermText(snapshot.professional?.name), { keepTogether: true });
       this.renderPageFooters(document, snapshot.professional, hasCoverPage);
       document.end();
     });
@@ -810,6 +816,7 @@ export class ReportsService {
     if (snapshot.exportOptions.chapters.anamnesis) {
       lines.push("4. Análise dos resultados", "");
       lines.push("4.1. Anamnese", "");
+      if (!this.hasAnamnesis(anamnesis)) lines.push("Não informada.", "");
       section(true, "4.1.1. História pessoal e desenvolvimento", [this.displayValue(anamnesis.personalHistory)]);
       section(true, "4.1.2. Contexto familiar e relacional", [this.displayValue(anamnesis.familyContext)]);
       section(true, "4.1.3. Histórico médico e psiquiátrico", [this.displayValue(anamnesis.medicalHistory)]);
@@ -1640,20 +1647,41 @@ export class ReportsService {
   }
 
   private displayValue(value: unknown) {
-    return typeof value === "object"
-      ? JSON.stringify(value)
-      : String(value ?? "—");
+    if (value === null || value === undefined || (typeof value === "string" && !value.trim())) return "—";
+    return typeof value === "object" ? JSON.stringify(value) : String(value);
+  }
+
+  private hasAnamnesis(anamnesis: Record<string, unknown>) {
+    return ["personalHistory", "familyContext", "medicalHistory", "psychosocialFactors"]
+      .some((key) => this.displayValue(anamnesis[key]) !== "—");
   }
 
   private renderTextSection(
     document: PDFKit.PDFDocument,
     title: string,
     content?: string | null,
+    options: { keepTogether?: boolean } = {},
   ) {
     if (!content || content === "—") return;
-    if (document.y > document.page.height - document.page.margins.bottom - 92)
-      document.addPage();
+    const available = document.page.height - document.page.margins.bottom - document.y;
+    const width = document.page.width - document.page.margins.left - document.page.margins.right;
+    const needed = options.keepTogether
+      ? 40 + document.font("Helvetica").fontSize(10).heightOfString(content, { width, align: "justify", lineGap: 2 })
+      : 92;
+    if (available < needed) document.addPage();
     document.moveDown(0.8).font("Helvetica-Bold").fontSize(12).fillColor("#111111").text(title);
     document.moveDown(0.35).font("Helvetica").fontSize(10).fillColor("#222222").text(content, { align: "justify", lineGap: 2 });
+  }
+
+  private captureTextState(document: PDFKit.PDFDocument) {
+    // PDFKit não expõe getters públicos para fonte/cor atuais.
+    const state = document as unknown as { _font?: { name?: string }; _fontSize?: number; _fillColor?: [unknown, number] };
+    return { font: state._font?.name, size: state._fontSize, fill: state._fillColor };
+  }
+
+  private restoreTextState(document: PDFKit.PDFDocument, state: ReturnType<ReportsService["captureTextState"]>) {
+    if (state.font) document.font(state.font);
+    if (state.size) document.fontSize(state.size);
+    if (state.fill) document.fillColor(state.fill[0] as PDFKit.Mixins.ColorValue, state.fill[1]);
   }
 }

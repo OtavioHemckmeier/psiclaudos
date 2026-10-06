@@ -70,8 +70,8 @@ export function InstrumentFieldControl({
     );
   }
   if (field.type === "SINGLE_CHOICE" || (field.type === "SCALE" && field.options?.length)) {
-    if (field.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(field.id) || field.id.startsWith("bai_") || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id)) {
-      const isSnapIv = field.id.startsWith("snap_iv_") || field.id.startsWith("bai_");
+    if (field.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(field.id) || field.id.startsWith("bai_") || /^bdi_ii_\d+$/.test(field.id) || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id)) {
+      const isSnapIv = field.id.startsWith("snap_iv_") || field.id.startsWith("bai_") || field.id.startsWith("bdi_ii_");
       return (
         <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(field.id) ? "scared-choice-list" : isSnapIv ? "snapiv-choice-list" : "asrs-choice-list"}>
           {field.options?.map((option) => (

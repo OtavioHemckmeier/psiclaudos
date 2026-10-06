@@ -6,6 +6,7 @@ import { asrs18Instrument, demoInstrument, snapIvInstrument } from './instrument
 import { scaredCInstrument } from './scared-c-config';
 import { scaredPInstrument } from './scared-p-config';
 import { baiInstrument } from './bai-config';
+import { BDI_II_MAX_SCORE, bdiIIInstrument } from './bdi-ii-config';
 import { validateRules } from '@laudo/rule-engine';
 import type { InstrumentRule } from '@laudo/contracts';
 
@@ -41,6 +42,7 @@ export class CatalogService {
     await this.seedScaredC();
     await this.seedScaredP();
     await this.seedBai();
+    await this.seedBdiII();
     const existing = await this.prisma.instrumentDefinition.findUnique({ where: { code: demoInstrument.code } });
     if (existing) { await this.prisma.instrumentVersion.updateMany({ where: { instrumentId: existing.id, version: demoInstrument.version }, data: { presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue } }); return existing; }
     const contentHash = createHash('sha256').update(JSON.stringify(demoInstrument)).digest('hex');
@@ -74,6 +76,49 @@ export class CatalogService {
       return;
     }
     await this.prisma.instrumentVersion.create({ data: { instrumentId: instrument.id, version: baiInstrument.version, status: 'PUBLISHED', publishedAt: new Date(), ...versionData } });
+  }
+
+  private async seedBdiII() {
+    const description = 'Inventário de Depressão de Beck — Segunda Edição (adaptação brasileira).';
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: bdiIIInstrument.code },
+      update: { name: bdiIIInstrument.name, description, category: 'Depressão', status: 'ACTIVE' },
+      create: { code: bdiIIInstrument.code, name: bdiIIInstrument.name, description, category: 'Depressão' },
+    });
+    const contentHash = createHash('sha256').update(JSON.stringify(bdiIIInstrument)).digest('hex');
+    const versionData = {
+      formSchema: bdiIIInstrument.formSchema as unknown as Prisma.InputJsonValue,
+      rules: bdiIIInstrument.rules as unknown as Prisma.InputJsonValue,
+      outputSchema: bdiIIInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+      presentationSchema: bdiIIInstrument.presentationSchema as unknown as Prisma.InputJsonValue,
+      contentHash,
+      sourceMetadata: {
+        platform: {
+          subtitle: 'Inventário de Depressão de Beck — Segunda Edição',
+          audience: 'A partir de 10 anos',
+          authors: 'Aaron T. Beck, Robert A. Steer e Gregory K. Brown',
+          itemCount: 21, format: 'Autorrelato', purpose: 'Sintomas depressivos',
+          domains: [], professionalUse: 'Restrito a psicólogos', applicationEnabled: true,
+        },
+        entryMode: 'ITEM_SCORES_FROM_PRINTED_BOOKLET',
+        calculation: { type: 'SUM', itemMinimum: 0, itemMaximum: 3, scoreMinimum: 0, scoreMaximum: BDI_II_MAX_SCORE, output: 'bdi_ii_total_raw' },
+        norms: { enabled: false }, classification: { enabled: false }, domains: { enabled: false }, interpretation: { enabled: false },
+        regulatory: { source: 'SATEPSI / Conselho Federal de Psicologia', status: 'FAVORAVEL_INFORMADO_PELO_SOLICITANTE', verifiedAt: null },
+        features: { rawScore: true, review: true, export: true },
+      } as Prisma.InputJsonValue,
+      licenseMetadata: {
+        status: 'PENDING_CONFIRMATION',
+        modalities: ['ITEM_SCORE_ENTRY', 'RESPONSE_STORAGE', 'RAW_SCORE'],
+        itemTextReproduced: false,
+        correctionStatus: 'RAW_SCORE_ONLY',
+      } as Prisma.InputJsonValue,
+    };
+    const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: bdiIIInstrument.version } });
+    if (existing) {
+      await this.updateSeedVersion(existing, bdiIIInstrument.code, versionData);
+      return;
+    }
+    await this.prisma.instrumentVersion.create({ data: { instrumentId: instrument.id, version: bdiIIInstrument.version, status: 'PUBLISHED', publishedAt: new Date(), ...versionData } });
   }
 
   private async seedScaredC() {

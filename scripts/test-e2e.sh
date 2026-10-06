@@ -45,7 +45,13 @@ patient_id="$(printf '%s' "$patient" | json_value 'id')"
 evaluation="$(curl -fsS -H "Authorization: Bearer $token_a" -H 'Content-Type: application/json' --data "{\"patientId\":\"$patient_id\",\"title\":\"Fluxo E2E\"}" "$api_base/evaluations")"
 evaluation_id="$(printf '%s' "$evaluation" | json_value 'id')"
 instruments="$(curl -fsS "$api_base/instruments")"
-version_id="$(printf '%s' "$instruments" | json_value '0.versions.0.id')"
+# Usa o instrumento demonstrativo pelo código (a posição na lista muda quando instrumentos são adicionados).
+version_id="$(printf '%s' "$instruments" | node -e '
+  const list = JSON.parse(require("fs").readFileSync(0, "utf8"));
+  const demo = list.find((instrument) => instrument.code === "DEMO-CORRECAO");
+  if (!demo?.versions?.[0]?.id) process.exit(1);
+  process.stdout.write(demo.versions[0].id);
+')"
 application="$(curl -fsS -H "Authorization: Bearer $token_a" -H 'Content-Type: application/json' --data "{\"instrumentVersionId\":\"$version_id\"}" "$api_base/evaluations/$evaluation_id/applications")"
 application_id="$(printf '%s' "$application" | json_value 'id')"
 

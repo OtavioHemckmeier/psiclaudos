@@ -13,7 +13,7 @@ Marcar como concluído somente após cumprir os critérios de liberação deste 
 - [~] 03. SCARED-C — formulário, pontuação e laudo existentes; tradução em português e uso clínico aguardam validação profissional.
 - [~] 04. SCARED-P — formulário, pontuação e laudo existentes; versão em português e uso clínico aguardam validação profissional.
 - [~] 05. BAI — formulário, escore bruto e laudo factual existentes na configuração Cunha 2001; conciliar com a identificação BAI-2023-BR da ficha e conferir manual, licença e validação profissional.
-- [ ] 06. BDI — confirmar edição, incluindo se será BDI-II.
+- [~] 06. BDI-II — página informativa, registro da pontuação dos 21 itens transcrita do caderno impresso (sem reproduzir enunciados), escore bruto 0–63, aviso do item 9 na tela e laudo factual na configuração `br-registro-escore-bruto-v1` ([ficha](docs/instruments/bdi-ii-br.md)). Pendentes: manual (faixas de gravidade, normas, domínios, itens 16/18), consulta ao SATEPSI, licença de uso digital e validação profissional.
 - [ ] 07. CDI — confirmar edição.
 - [ ] 08. MASC — confirmar edição.
 - [ ] 09. ETDAH — definir edição e formulários solicitados; abrir um item por formulário antes da implementação.

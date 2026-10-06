@@ -35,6 +35,7 @@ import { SnapIvResults } from "./snap-iv-results";
 import { ScaredCCard, ScaredCPage } from "./scared-c";
 import { ScaredPCard, ScaredPPage, ScaredPResults } from "./scared-p";
 import { BaiCard, BaiPage } from "./bai";
+import { BdiIICard, BdiIIPage } from "./bdi-ii";
 import { InstrumentFieldControl, type InstrumentField } from "./instrument-field";
 
 const API = import.meta.env.VITE_API_URL ?? "/api";
@@ -384,6 +385,9 @@ const navItems: NavItem[] = [
   { to: "/perfil", label: "Perfil", shortLabel: "Perfil", Icon: PersonCircleIcon, inTabBar: true },
   { to: "/configuracoes", label: "Configurações", shortLabel: "Ajustes", Icon: GearIcon, inTabBar: false },
 ];
+
+/** Instrumentos com card e página informativa próprios (arquivos .tsx dedicados). */
+const customPageInstrumentCodes = ["SNAP-IV", "SCARED-C", "SCARED-P", "BAI", "BDI-II"];
 
 const statusLabel = (status?: string) =>
   ({
@@ -838,7 +842,7 @@ function Dashboard({
     localStorage.setItem("laudo_sidebar_collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
   const platformInstruments = instruments.filter(
-    (instrument) => !["SNAP-IV", "SCARED-C", "SCARED-P", "BAI"].includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
+    (instrument) => !customPageInstrumentCodes.includes(instrument.code) && instrument.versions[0]?.sourceMetadata?.platform,
   );
   const selectedPlatformInstrument = platformInstruments.find(
     (instrument) => instrument.code === platformTestCode,
@@ -2064,7 +2068,7 @@ function Dashboard({
                 </p>
               </div>
               <span className="platform-tests-count">
-                {platformInstruments.length + 4} teste{platformInstruments.length + 4 === 1 ? "" : "s"}
+                {platformInstruments.length + customPageInstrumentCodes.length} teste{platformInstruments.length + customPageInstrumentCodes.length === 1 ? "" : "s"}
               </span>
             </div>
             <div className="platform-tests-grid">
@@ -2072,6 +2076,7 @@ function Dashboard({
               <ScaredCCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-c")} />
               <ScaredPCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-p")} />
               <BaiCard onOpen={() => routerNavigate("/testes-da-plataforma/bai")} />
+              <BdiIICard onOpen={() => routerNavigate("/testes-da-plataforma/bdi-ii")} />
               {platformInstruments.map((instrument) => {
                 const metadata = instrument.versions[0]?.sourceMetadata?.platform;
                 if (!metadata) return null;
@@ -2114,6 +2119,9 @@ function Dashboard({
         )}
         {view === "platformTest" && platformTestCode === "BAI" && (
           <BaiPage onBack={() => navigate("platformTests")} />
+        )}
+        {view === "platformTest" && platformTestCode === "BDI-II" && (
+          <BdiIIPage onBack={() => navigate("platformTests")} />
         )}
         {view === "platformTest" && selectedPlatformInstrument && selectedPlatformMetadata && (
           <section className="platform-test-page">
@@ -2196,7 +2204,7 @@ function Dashboard({
             </div>
           </section>
         )}
-        {view === "platformTest" && !["SNAP-IV", "SCARED-C", "SCARED-P", "BAI"].includes(platformTestCode ?? "") && !selectedPlatformInstrument && !loading && (
+        {view === "platformTest" && !customPageInstrumentCodes.includes(platformTestCode ?? "") && !selectedPlatformInstrument && !loading && (
           <section className="panel empty-view">
             <h2>Teste não encontrado</h2>
             <button onClick={() => navigate("platformTests")}>Ver testes da plataforma</button>
@@ -2612,7 +2620,10 @@ function Dashboard({
                 {application.instrumentVersion.instrument.code === "BAI" && (
                   <p className="notice">A plataforma calcula somente o escore bruto total. Domínios, normas, classificação e inclusão no laudo permanecem indisponíveis até validação técnica e profissional.</p>
                 )}
-                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : application.instrumentVersion.instrument.code === "BAI" || application.instrumentVersion.instrument.name === "SNAP-IV" ? "snapiv-form-sections" : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? "scared-form-sections" : ""}`}>
+                {application.instrumentVersion.instrument.code === "BDI-II" && (
+                  <p className="notice">Aplique o caderno impresso e registre aqui a pontuação de cada item (0 a 3). A plataforma calcula somente o escore bruto total; classificação de gravidade, domínios e normas permanecem indisponíveis até a conferência do manual.</p>
+                )}
+                <div className={`form-sections ${application.instrumentVersion.instrument.name === "ASRS-18" ? "asrs-form-sections" : ["BAI", "BDI-II"].includes(application.instrumentVersion.instrument.code ?? "") || application.instrumentVersion.instrument.name === "SNAP-IV" ? "snapiv-form-sections" : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? "scared-form-sections" : ""}`}>
                   {application.instrumentVersion.formSchema.sections.map(
                     (section) => (
                       (application.instrumentVersion.instrument.name !== "SNAP-IV" || !application.instrumentVersion.formSchema.sections.some((item) => item.id.startsWith("snap_iv_form_")) || section.id.startsWith(`snap_iv_form_${snapIvFormTab}_`)) &&
@@ -2622,8 +2633,8 @@ function Dashboard({
                         className={section.id.includes("_respondent_section") ? "snapiv-respondent-section" : section.id === "parent_report_respondent" ? "scared-respondent-section" : undefined}
                       >
                         <h3>{section.title}</h3>
-                        {(section.fields[0]?.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(section.fields[0]?.id ?? "") || section.fields[0]?.id.startsWith("bai_") || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "")) && (
-                          <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "") ? "scared-choice-header" : section.fields[0]?.id.startsWith("snap_iv_") || section.fields[0]?.id.startsWith("bai_") ? "snapiv-choice-header" : "asrs-choice-header"} aria-hidden="true">
+                        {(section.fields[0]?.id.startsWith("asrs_") || /^snap_iv_(?:form_\d+_item_\d+|\d+)$/.test(section.fields[0]?.id ?? "") || section.fields[0]?.id.startsWith("bai_") || /^bdi_ii_\d+$/.test(section.fields[0]?.id ?? "") || /^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "")) && (
+                          <div className={/^scared_(?:c_\d+|p_(?:form_\d+_item_\d+|\d+))$/.test(section.fields[0]?.id ?? "") ? "scared-choice-header" : section.fields[0]?.id.startsWith("snap_iv_") || section.fields[0]?.id.startsWith("bai_") || section.fields[0]?.id.startsWith("bdi_ii_") ? "snapiv-choice-header" : "asrs-choice-header"} aria-hidden="true">
                             <span>Questões</span>
                             {section.fields[0].options?.map((option) => (
                               <span key={option.value}>{option.label}</span>
@@ -2661,7 +2672,7 @@ function Dashboard({
                         Salvar rascunho
                       </button>
                       <button onClick={() => void calculate()}>
-                        {application.instrumentVersion.instrument.code === "BAI" ? "Calcular escore bruto" : "Calcular resultado"}
+                        {["BAI", "BDI-II"].includes(application.instrumentVersion.instrument.code ?? "") ? "Calcular escore bruto" : "Calcular resultado"}
                       </button>
                     </>
                   )}
@@ -2718,6 +2729,25 @@ function Dashboard({
                         </table>
                       </div>
                       <p>Este é apenas o somatório bruto das respostas. Não há classificação, interpretação por domínios ou conclusão clínica automatizada.</p>
+                    </>
+                  ) : application.instrumentVersion.instrument.code === "BDI-II" ? (
+                    <>
+                      {Number(application.result.bdi_ii_item_9_score ?? 0) >= 1 && (
+                        <p className="notice notice-risk" role="alert">
+                          Item 9 (pensamentos ou desejos suicidas) pontuado em {String(application.result.bdi_ii_item_9_score)}. Avalie o risco imediatamente, conforme o protocolo profissional.
+                        </p>
+                      )}
+                      <div className="result result-table-wrap">
+                        <table className="result-table">
+                          <thead><tr><th>Pontuação total</th><th>Classificação</th></tr></thead>
+                          <tbody><tr><td>{String(application.result.bdi_ii_total_raw ?? "—")} / 63</td><td>Não disponível nesta versão</td></tr></tbody>
+                        </table>
+                      </div>
+                      <p>Somatório bruto da pontuação registrada. A classificação de gravidade depende das faixas e normas do manual da adaptação brasileira, ainda não conferidas nesta versão.</p>
+                      <label>Revise o resultado e escreva sua síntese
+                        <textarea disabled={application.status === "LOCKED"} value={summary} onChange={(event) => setSummary(event.target.value)} rows={5} />
+                      </label>
+                      <button className="secondary" disabled={application.status === "LOCKED"} onClick={() => void saveSummary()}>Salvar síntese</button>
                     </>
                   ) : ["SCARED-C", "SCARED-P"].includes(application.instrumentVersion.instrument.name) ? (
                     <>

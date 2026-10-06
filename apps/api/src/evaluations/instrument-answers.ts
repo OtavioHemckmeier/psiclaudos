@@ -81,6 +81,14 @@ export function prepareInstrumentAnswers(code: string, schema: FormSchema, answe
 }
 
 export function filterInstrumentResult(result: RuleEngineResult, prepared: PreparedAnswers): RuleEngineResult {
+  if (Object.prototype.hasOwnProperty.call(result.outputs, 'bdi_ii_total_raw')) {
+    // Guarda só o escore bruto e o item 9 (aviso de risco); respostas ficam em `answers`.
+    result.outputs = {
+      bdi_ii_total_raw: result.outputs.bdi_ii_total_raw,
+      bdi_ii_item_9_score: result.outputs.bdi_ii_item_9_score,
+    };
+    return result;
+  }
   if (Object.prototype.hasOwnProperty.call(result.outputs, 'bai_total_raw')) {
     result.outputs = Object.fromEntries(Object.entries(result.outputs).filter(([field]) => field === 'bai_total_raw' || field === 'bai_answered_items'));
     return result;

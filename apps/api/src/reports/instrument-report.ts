@@ -43,6 +43,12 @@ const reportContent: Record<string, InstrumentReportContent> = {
       "Mattos, P. et al. Adaptação transcultural da ASRS para o português. Revista de Psiquiatria Clínica, 2006.",
     ],
   },
+  "BDI-II": {
+    purpose: "registrar a intensidade de sintomas depressivos por autorrelato, conforme a adaptação brasileira utilizada.",
+    theoreticalContext: "O BDI-II reúne 21 grupos de afirmações sobre sintomas depressivos nas duas semanas anteriores, cada um pontuado de 0 a 3. Nesta versão, a plataforma registra a pontuação de cada item e apresenta somente a soma bruta, de 0 a 63.",
+    interpretation: "A classificação de gravidade e a interpretação clínica automática não estão disponíveis nesta versão da plataforma. A análise do escore deve seguir o manual e as normas da adaptação brasileira e ser integrada à entrevista e às demais fontes da avaliação.",
+    references: ["Werlang, B. S. G.; Gorenstein, C.; Argimon, I. I. L. & Wang, Y. P. (2010). Inventário de Depressão de Beck (BDI-II). São Paulo: Casapsi Livraria e Editora."],
+  },
   "SNAP-IV": {
     purpose: "avaliar relatos de desatenção, hiperatividade/impulsividade e oposição/desafio em crianças e adolescentes.",
     theoreticalContext: "A SNAP-IV de 26 itens reúne relatos sobre desatenção (itens 1–9), hiperatividade/impulsividade (10–18) e oposição/desafio (19–26). Cada item recebe de 0 a 3 pontos; as pontuações são somadas por domínio.",
@@ -89,6 +95,10 @@ export const scaredReportTableNote = "Pontuação: soma dos itens da dimensão (
 export function instrumentReportTables(code: string, result: Record<string, unknown>, presentation: PresentationSchema): InstrumentReportTable[] {
   if (code === "BAI" && "bai_total_raw" in result) {
     return [{ kind: "matrix", title: "BAI — resultado", headers: ["Pontuação total", "Itens respondidos", "Classificação"], rows: [[`${String(result.bai_total_raw)} / 63`, `${String(result.bai_answered_items ?? 21)} / 21`, "Não disponível para esta versão"]] }];
+  }
+  if (code === "BDI-II" && "bdi_ii_total_raw" in result) {
+    // O item 9 fica fora do documento exportado; o aviso aparece somente na tela.
+    return [{ kind: "matrix", title: "BDI-II — resultado", headers: ["Pontuação total", "Classificação"], rows: [[`${String(result.bdi_ii_total_raw)} / 63`, "Não disponível"]] }];
   }
   if (code === "SNAP-IV") {
     const formNumbers = [...new Set(Object.keys(result)
