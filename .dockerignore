@@ -1,7 +1,19 @@
-node_modules
-dist
-coverage
-.git
-.idea
-storage
+# Build é feito dentro da imagem: nada de artefatos locais.
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
 *.log
+
+# Dados e segredos nunca entram no contexto da imagem
+# (PDFs de laudos, backups do Mongo e arquivos .env).
+**/storage
+backups
+.env
+.env.*
+!.env.example
+
+# Metadados do repositório/IDE
+.git
+.github
+.idea

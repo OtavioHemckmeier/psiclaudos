@@ -110,3 +110,31 @@ GOOGLE_OAUTH_REDIRECT_URI=https://seu-dominio/api/reports/google-docs/callback
 ```
 
 Ao escolher **Google Docs** no menu de exportação, o profissional autoriza sua conta Google e recebe um documento editável com o conteúdo, as tabelas de resultados e gráficos em PNG. Cada gráfico apresenta legenda, escala, resultado observado e faixa esperada; a imagem é enviada temporariamente ao Drive e excluída após sua inserção no documento.
+
+## Release e imagens Docker
+
+```bash
+npm run release
+```
+
+O comando roda a partir do `master` atualizado e com a árvore limpa. Ele usa o `standard-version` para calcular a versão pelos commits (`feat` → minor, `fix` → patch), atualizar o `CHANGELOG.md`, criar o commit `chore(release)` e a tag `vX.Y.Z`, e enviar branch e tag para o GitHub.
+
+O push da tag dispara [`.github/workflows/docker-publish.yml`](./.github/workflows/docker-publish.yml), que gera e publica no GitHub Container Registry:
+
+- `ghcr.io/otaviohemckmeier/psiclaudos-api:vX.Y.Z` e `:latest`
+- `ghcr.io/otaviohemckmeier/psiclaudos-web:vX.Y.Z` e `:latest`
+
+Opções úteis: `npm run release -- --dry-run` (só mostra o que faria), `--release-as minor|major|1.0.0` e `--first-release` (cria a tag da versão atual sem incrementar). O workflow também pode ser executado manualmente em **Actions → Docker Publish**.
+
+O deploy é manual. No servidor:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <usuario> --password-stdin   # token com read:packages
+docker pull ghcr.io/otaviohemckmeier/psiclaudos-api:vX.Y.Z
+docker pull ghcr.io/otaviohemckmeier/psiclaudos-web:vX.Y.Z
+```
+
+Requisitos de execução das imagens:
+
+- **API** (porta 3000): `DATABASE_URL` (MongoDB com replica set), `NODE_ENV=production`, `JWT_SECRET` e `JWT_REFRESH_SECRET` fortes, `WEB_ORIGIN` e, se usar Google Docs, as variáveis `GOOGLE_OAUTH_*`. Ao iniciar, ela aplica `prisma db push` e o backfill. Monte um volume persistente em `/app/storage` (PDFs dos laudos).
+- **Web** (porta 80): nginx com o front e proxy de `/api/` para a API. O endereço interno da API vem de `API_UPSTREAM` (padrão `http://api:3000`); o nome precisa resolver na rede do container quando o nginx sobe.

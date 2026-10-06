@@ -15,6 +15,10 @@
     "dev:api:local": "npm --workspace packages/contracts run build && npm --workspace packages/rule-engine run build && npm --workspace apps/api run db:push && npm --workspace apps/api run db:backfill:evaluations && npm --workspace apps/api run build && bash scripts/dev-api-watch.sh",
     "build": "npm --workspace packages/contracts run build && npm --workspace packages/rule-engine run build && npm --workspace apps/api run build && npm --workspace apps/web run build",
     "test": "npm run test -ws",
-    "lint": "npm run lint -ws"
+    "lint": "npm run lint -ws",
+    "release": "./scripts/release.sh"
+  },
+  "devDependencies": {
+    "standard-version": "9.5.0"
   }
 }

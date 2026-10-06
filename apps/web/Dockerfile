@@ -16,6 +16,10 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build --workspace apps/web
 
 FROM nginx:1.27-alpine
-COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
+# O entrypoint do nginx gera /etc/nginx/conf.d/default.conf a partir do template,
+# substituindo apenas variáveis de ambiente definidas (ex.: API_UPSTREAM).
+ENV API_UPSTREAM=http://api:3000
+RUN rm -f /etc/nginx/conf.d/default.conf
+COPY infra/docker/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 EXPOSE 80
