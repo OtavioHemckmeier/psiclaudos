@@ -119,14 +119,25 @@ npm run release
 
 O comando roda a partir do `master` atualizado e com a árvore limpa. Ele usa o `standard-version` para calcular a versão pelos commits (`feat` → minor, `fix` → patch), atualizar o `CHANGELOG.md`, criar o commit `chore(release)` e a tag `vX.Y.Z`, e enviar branch e tag para o GitHub.
 
-O push da tag dispara [`.github/workflows/docker-publish.yml`](./.github/workflows/docker-publish.yml), que gera e publica no GitHub Container Registry:
+Cada push no `master`, push de tag `v*` ou execução manual dispara [`.github/workflows/docker-publish.yml`](./.github/workflows/docker-publish.yml). Após build, testes e checagem de tipos, ele publica no GitHub Container Registry:
 
 - `ghcr.io/otaviohemckmeier/psiclaudos-api:vX.Y.Z` e `:latest`
 - `ghcr.io/otaviohemckmeier/psiclaudos-web:vX.Y.Z` e `:latest`
 
+Cada imagem também recebe a tag `sha-<commit completo>`. No push de branch, essa é a versão usada para o deploy; tags de release continuam disponíveis como `vX.Y.Z`.
+
 Opções úteis: `npm run release -- --dry-run` (só mostra o que faria), `--release-as minor|major|1.0.0` e `--first-release` (cria a tag da versão atual sem incrementar). O workflow também pode ser executado manualmente em **Actions → Docker Publish**.
 
-O deploy é manual. No servidor:
+Após publicar as duas imagens, o workflow faz deploy automático nesta VPS pelo runner self-hosted com labels `linux`, `x64`, `deploy` e `psiclaudos`. O runner precisa estar registrado no repositório e ter acesso ao Docker Swarm manager. Ele atualiza `psiclaudos_api` e `psiclaudos_web` usando o digest das imagens daquele commit, preservando secrets, volumes, redes e regras do Traefik configurados na stack existente. Os deploys são serializados, esperam a convergência dos serviços e verificam o web e a saúde da API pelos dois domínios através do Traefik. Falhas de atualização acionam rollback do serviço afetado e são reportadas pelo pipeline.
+
+Endereços de produção:
+
+- Web: https://psiclaudos.hemck.com.br
+- API: https://psiclaudos-api.hemck.com.br/api
+
+O banco e os PDFs persistem entre deploys. Como a API aplica `prisma db push` ao iniciar, mudanças de schema precisam ser compatíveis com rollback da imagem; o rollback não desfaz mudanças de banco.
+
+Para baixar imagens manualmente no servidor:
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u <usuario> --password-stdin   # token com read:packages
