@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
   validate:
@@ -15,6 +15,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm --workspace apps/api run db:generate
+        env:
+          DATABASE_URL: mongodb://localhost:27017/psiclaudos
       - run: npm run build
       - run: npm run test
       - run: npm run lint

@@ -1,17 +1,17 @@
-name: Docker Publish
+name: Docker Publish and Deploy
 
 # Publica as imagens da API e do web no GitHub Container Registry (GHCR).
-# Disparo normal: `npm run release` cria e envia a tag vX.Y.Z.
-# O deploy é feito manualmente no servidor (este workflow não implanta nada).
+# Push no master, release ou execução manual publica e implanta na VPS.
 
 on:
   push:
+    branches: [master]
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Tag extra da imagem (além de latest) para uma publicação manual
+        description: Tag extra da imagem para publicar e implantar
         required: false
         default: latest
 
@@ -19,10 +19,30 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: psiclaudos-production
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm --workspace apps/api run db:generate
+        env:
+          DATABASE_URL: mongodb://localhost:27017/psiclaudos
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+
   resolve-tag:
     runs-on: ubuntu-latest
     outputs:
@@ -39,21 +59,30 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           OWNER: ${{ github.repository_owner }}
           REPOSITORY: ${{ github.repository }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             IMAGE_TAG="${TAG_INPUT:-latest}"
-          else
+          elif [ "$REF_TYPE" = "tag" ]; then
             IMAGE_TAG="$REF_NAME"
+          else
+            IMAGE_TAG="sha-${GITHUB_SHA}"
+          fi
+          if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo '::error::Tag de imagem inválida.'
+            exit 1
           fi
           # GHCR exige nomes em minúsculas: ghcr.io/<dono>/<repositorio>-<servico>
-          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "namespace=${OWNER,,}" >> "$GITHUB_OUTPUT"
-          echo "image_prefix=$(basename "${REPOSITORY,,}")" >> "$GITHUB_OUTPUT"
+          {
+            echo "image_tag=${IMAGE_TAG}"
+            echo "namespace=${OWNER,,}"
+            echo "image_prefix=$(basename "${REPOSITORY,,}")"
+          } >> "$GITHUB_OUTPUT"
 
   build-and-push:
     runs-on: ubuntu-latest
-    needs: resolve-tag
+    needs: [resolve-tag, validate]
 
     env:
       IMAGE_TAG: ${{ needs.resolve-tag.outputs.image_tag }}
@@ -94,6 +123,7 @@ jobs:
           file: ./${{ matrix.dockerfile }}
           push: true
           tags: |
+            ${{ env.IMAGE_BASE }}-${{ matrix.service }}:sha-${{ github.sha }}
             ${{ env.IMAGE_BASE }}-${{ matrix.service }}:latest
             ${{ env.IMAGE_BASE }}-${{ matrix.service }}:${{ env.IMAGE_TAG }}
           labels: |
@@ -114,3 +144,64 @@ jobs:
             echo "${IMAGE_BASE}-${{ matrix.service }}:latest"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    runs-on: [self-hosted, linux, x64, deploy, psiclaudos]
+    needs: [resolve-tag, build-and-push]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    env:
+      API_IMAGE: ghcr.io/${{ needs.resolve-tag.outputs.namespace }}/${{ needs.resolve-tag.outputs.image_prefix }}-api:sha-${{ github.sha }}
+      WEB_IMAGE: ghcr.io/${{ needs.resolve-tag.outputs.namespace }}/${{ needs.resolve-tag.outputs.image_prefix }}-web:sha-${{ github.sha }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Swarm services
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker info --format '{{.Swarm.ControlAvailable}}')" = true
+          docker service inspect psiclaudos_api psiclaudos_web > /dev/null
+          docker pull "$API_IMAGE"
+          docker pull "$WEB_IMAGE"
+          API_DIGEST=$(docker image inspect "$API_IMAGE" --format '{{index .RepoDigests 0}}')
+          WEB_DIGEST=$(docker image inspect "$WEB_IMAGE" --format '{{index .RepoDigests 0}}')
+          for service in psiclaudos_api psiclaudos_web; do
+            if [ "$service" = psiclaudos_api ]; then
+              image="$API_DIGEST"
+            else
+              image="$WEB_DIGEST"
+            fi
+            docker service update --detach=false --with-registry-auth \
+              --update-order stop-first --update-failure-action rollback \
+              --update-monitor 60s --image "$image" "$service"
+            actual=$(docker service inspect "$service" --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}')
+            state=$(docker service inspect "$service" --format '{{if .UpdateStatus}}{{.UpdateStatus.State}}{{end}}')
+            if [ "$actual" != "$image" ] || [ "$state" != completed ]; then
+              echo "::error::Deploy de $service não concluiu: $state"
+              exit 1
+            fi
+          done
+
+      - name: Check routes through Traefik
+        shell: bash
+        run: |
+          set -euo pipefail
+          # O Traefik usa certificado de origem Cloudflare na conexão local.
+          curl --fail --silent --show-error --insecure --max-time 20 \
+            --retry 5 --retry-delay 5 --retry-all-errors \
+            --resolve psiclaudos.hemck.com.br:443:127.0.0.1 \
+            https://psiclaudos.hemck.com.br/ --output /dev/null
+          for host in psiclaudos.hemck.com.br psiclaudos-api.hemck.com.br; do
+            curl --fail --silent --show-error --insecure --max-time 20 \
+              --retry 5 --retry-delay 5 --retry-all-errors \
+              --resolve "$host:443:127.0.0.1" \
+              "https://$host/api/health/ready"
+          done
