@@ -629,3 +629,128 @@ html.theme-dark-root .auth-shell {
   font-size: 0.8rem;
   line-height: 1.45;
 }
+
+/* ───────────────────────── ETDAH-II ───────────────────────── */
+.etdah-form {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.etdah-form-tabs {
+  margin-bottom: 0;
+}
+.etdah-identification {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--ios-border);
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.etdah-identification label {
+  display: grid;
+  gap: 0.35rem;
+}
+.etdah-form > .field-help {
+  margin: -0.4rem 0 0;
+  line-height: 1.45;
+}
+.etdah-factor-table {
+  max-width: 820px;
+}
+.etdah-factor-table td:first-child {
+  font-weight: 500;
+}
+.etdah-factor-table td small {
+  display: block;
+  color: var(--ios-label-2);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+.etdah-factor-table input {
+  min-height: 36px;
+  padding: 0.4rem 0.6rem;
+}
+.etdah-factor-table td:nth-child(2) input,
+.etdah-factor-table td:nth-child(3) input,
+.etdah-factor-table td:nth-child(5) input {
+  max-width: 96px;
+  text-align: center;
+}
+.etdah-result {
+  margin-bottom: 1.4rem;
+}
+.etdah-result h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+.etdah-result h3 small {
+  color: var(--ios-label-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.etdah-result .result-table td:not(:first-child),
+.etdah-result .result-table th:not(:first-child) {
+  text-align: center;
+}
+.etdah-chart {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 760px;
+  padding: 1.6rem 1.2rem 1rem;
+  border: 1px solid var(--ios-border);
+  border-radius: var(--ios-radius);
+  background: var(--ios-card-2);
+}
+.etdah-chart-scale {
+  position: relative;
+  height: 1rem;
+  margin: 0 3rem 0 12rem;
+  color: var(--ios-label-2);
+  font-size: 0.7rem;
+}
+.etdah-chart-scale span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.etdah-chart-row {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr) 3rem;
+  align-items: center;
+}
+.etdah-chart-label {
+  padding-right: 0.8rem;
+  font-size: 0.85rem;
+}
+.etdah-chart-track {
+  height: 20px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--ios-fill);
+}
+.etdah-chart-bar {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--ios-tint-fill);
+}
+.etdah-chart-row strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 680px) {
+  .etdah-identification {
+    grid-template-columns: 1fr;
+  }
+  .etdah-chart-scale {
+    margin-left: 7rem;
+  }
+  .etdah-chart-row {
+    grid-template-columns: 7rem minmax(0, 1fr) 2.5rem;
+  }
+}

@@ -19,8 +19,8 @@ import {
   instrumentReportContent,
   instrumentReportPresentation,
   instrumentReportReferences,
+  instrumentReportTableNote,
   instrumentReportTables,
-  scaredReportTableNote,
   type InstrumentReportContent,
   type InstrumentReportTable,
   type PresentationField,
@@ -288,8 +288,8 @@ export class ReportsService {
           else
             await this.appendGoogleResultsTable(document.documentId, token.access_token, title, table.fields.map((field) => [field.label, field.value]));
         }
-        if (tables.some((table) => table.kind === "matrix") && (code === "SCARED-C" || code === "SCARED-P"))
-          await this.appendGoogleTextBlock(document.documentId, token.access_token, scaredReportTableNote);
+        const tableNote = instrumentReportTableNote(code, tables);
+        if (tableNote) await this.appendGoogleTextBlock(document.documentId, token.access_token, tableNote);
       }
       if (options.chart) {
         for (const chart of presentation.charts ?? []) {
@@ -512,8 +512,8 @@ export class ReportsService {
             else
               this.renderTable(document, { title, columns: table.fields.map(({ id, label }) => ({ id, label })) }, Object.fromEntries(table.fields.map(({ id, value }) => [id, value])));
           }
-          if (tables.some((table) => table.kind === "matrix") && (code === "SCARED-C" || code === "SCARED-P"))
-            document.moveDown(0.2).font("Helvetica").fontSize(8.5).fillColor("#344054").text(scaredReportTableNote, { align: "justify" });
+          const tableNote = instrumentReportTableNote(code, tables);
+          if (tableNote) document.moveDown(0.2).font("Helvetica").fontSize(8.5).fillColor("#344054").text(tableNote, { align: "justify" });
         }
         if (testOptions.chart)
           for (const chart of presentation.charts ?? []) {
@@ -1232,7 +1232,7 @@ export class ReportsService {
     const hasExpectedRange = Number.isFinite(rangeMaximum);
     const rangeStart = hasExpectedRange ? Math.max(0, Math.min(rangeMinimum, maximum)) : 0;
     const rangeEnd = hasExpectedRange ? Math.max(rangeStart, Math.min(rangeMaximum as number, maximum)) : 0;
-    const grid = Array.from({ length: Math.floor(maximum) + 1 }, (_, tick) => {
+    const grid = this.chartTicks(maximum).map((tick) => {
       const position = plotX + plotWidth * tick / maximum;
       return `<line x1="${position}" y1="${plotTop}" x2="${position}" y2="${plotTop + values.length * rowHeight - 8}" stroke="#dce5e8" stroke-width="0.35"/><text x="${position}" y="${plotTop - 5}" text-anchor="middle" font-size="7.5" fill="#667085">${tick}</text>`;
     }).join("");
@@ -1473,11 +1473,16 @@ export class ReportsService {
 
   private renderResultTable(document: PDFKit.PDFDocument, title: string, headers: string[], rows: string[][]) {
     const availableWidth = document.page.width - document.page.margins.left - document.page.margins.right;
-    const columnWidths = headers.length === 4
-      ? [availableWidth * 0.42, availableWidth * 0.16, availableWidth * 0.17, availableWidth * 0.25]
-      : [availableWidth * 0.45, availableWidth * 0.17, availableWidth * 0.38];
+    const proportions = ({
+      2: [0.5, 0.5],
+      4: [0.42, 0.16, 0.17, 0.25],
+      5: [0.34, 0.15, 0.13, 0.24, 0.14],
+    } as Record<number, number[]>)[headers.length] ?? [0.45, 0.17, 0.38];
+    const columnWidths = proportions.map((proportion) => availableWidth * proportion);
+    // Colunas numéricas centralizadas (pontuação, percentil, escore Z).
+    const centered = new Set(headers.length === 5 ? [1, 2, 4] : headers.length === 4 ? [1, 2] : [1]);
     const headerHeight = 27;
-    const rowHeight = headers.length === 4 ? 32 : 27;
+    const rowHeight = headers.length >= 4 ? 32 : 27;
     const tableHeight = headerHeight + rows.length * rowHeight;
     if (document.y > document.page.height - document.page.margins.bottom - tableHeight - 40) document.addPage();
     document.moveDown(0.6).font("Helvetica-Bold").fontSize(10).fillColor("#111111").text(title);
@@ -1493,7 +1498,7 @@ export class ReportsService {
         document.rect(cellLeft, rowTop, width, height).fill(rowIndex === 0 ? "#eaf5f4" : "#ffffff");
         document.rect(cellLeft, rowTop, width, height).lineWidth(0.4).strokeColor("#b7d8d4").stroke();
         document.font(rowIndex === 0 ? "Helvetica-Bold" : "Helvetica").fontSize(8).fillColor("#173f3b")
-          .text(value, cellLeft + 5, rowTop + 8, { width: width - 10, height: height - 10, align: columnIndex === 1 ? "center" : "left" });
+          .text(value, cellLeft + 5, rowTop + 8, { width: width - 10, height: height - 10, align: centered.has(columnIndex) ? "center" : "left" });
         cellLeft += width;
       });
     });
@@ -1582,13 +1587,13 @@ export class ReportsService {
     const rangeEnd = hasExpectedRange ? Math.max(rangeStart, Math.min(rangeMaximum as number, maximum)) : 0;
     const chartLeft = document.page.margins.left + labelWidth;
     const axisY = document.y + 18;
-    for (let tick = 0; tick <= Math.floor(maximum); tick += 1) {
+    for (const tick of this.chartTicks(maximum)) {
       const x = chartLeft + chartWidth * (tick / maximum);
       document
         .font("Helvetica")
         .fontSize(7.5)
         .fillColor("#667085")
-        .text(String(tick), x - 5, axisY - 12, { width: 10, align: "center", lineBreak: false });
+        .text(String(tick), x - 10, axisY - 12, { width: 20, align: "center", lineBreak: false });
       document.moveTo(x, axisY).lineTo(x, axisY + values.length * 44 - 8).lineWidth(0.35).strokeColor("#dce5e8").stroke();
     }
     values.forEach((field, index) => {
@@ -1671,6 +1676,12 @@ export class ReportsService {
     if (available < needed) document.addPage();
     document.moveDown(0.8).font("Helvetica-Bold").fontSize(12).fillColor("#111111").text(title);
     document.moveDown(0.35).font("Helvetica").fontSize(10).fillColor("#222222").text(content, { align: "justify", lineGap: 2 });
+  }
+
+  /** Marcações do eixo: de 1 em 1 até 30; acima disso, de 10 em 10 (ex.: percentis 0–100). */
+  private chartTicks(maximum: number) {
+    const step = maximum > 30 ? 10 : 1;
+    return Array.from({ length: Math.floor(maximum / step) + 1 }, (_, index) => index * step);
   }
 
   private captureTextState(document: PDFKit.PDFDocument) {

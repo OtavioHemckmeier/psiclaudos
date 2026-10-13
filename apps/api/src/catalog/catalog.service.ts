@@ -7,6 +7,7 @@ import { scaredCInstrument } from './scared-c-config';
 import { scaredPInstrument } from './scared-p-config';
 import { baiInstrument } from './bai-config';
 import { BDI_II_MAX_SCORE, bdiIIInstrument } from './bdi-ii-config';
+import { etdahIIFactors, etdahIIInstrument, etdahIIReferenceGroups } from './etdah-ii-config';
 import { validateRules } from '@laudo/rule-engine';
 import type { InstrumentRule } from '@laudo/contracts';
 
@@ -43,6 +44,7 @@ export class CatalogService {
     await this.seedScaredP();
     await this.seedBai();
     await this.seedBdiII();
+    await this.seedEtdahII();
     const existing = await this.prisma.instrumentDefinition.findUnique({ where: { code: demoInstrument.code } });
     if (existing) { await this.prisma.instrumentVersion.updateMany({ where: { instrumentId: existing.id, version: demoInstrument.version }, data: { presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue } }); return existing; }
     const contentHash = createHash('sha256').update(JSON.stringify(demoInstrument)).digest('hex');
@@ -119,6 +121,50 @@ export class CatalogService {
       return;
     }
     await this.prisma.instrumentVersion.create({ data: { instrumentId: instrument.id, version: bdiIIInstrument.version, status: 'PUBLISHED', publishedAt: new Date(), ...versionData } });
+  }
+
+  private async seedEtdahII() {
+    const description = 'Escala do Transtorno de Déficit de Atenção/Hiperatividade em Contexto Escolar — Versão para Professores.';
+    const instrument = await this.prisma.instrumentDefinition.upsert({
+      where: { code: etdahIIInstrument.code },
+      update: { name: etdahIIInstrument.name, description, category: 'TDAH', status: 'ACTIVE' },
+      create: { code: etdahIIInstrument.code, name: etdahIIInstrument.name, description, category: 'TDAH' },
+    });
+    const contentHash = createHash('sha256').update(JSON.stringify(etdahIIInstrument)).digest('hex');
+    const versionData = {
+      formSchema: etdahIIInstrument.formSchema as unknown as Prisma.InputJsonValue,
+      rules: etdahIIInstrument.rules as unknown as Prisma.InputJsonValue,
+      outputSchema: etdahIIInstrument.outputSchema as unknown as Prisma.InputJsonValue,
+      presentationSchema: etdahIIInstrument.presentationSchema as unknown as Prisma.InputJsonValue,
+      contentHash,
+      sourceMetadata: {
+        platform: {
+          subtitle: 'Escala do TDAH em Contexto Escolar — Versão para Professores',
+          audience: '6 a 18 anos',
+          authors: 'Edyleine Bellini Peroni Benczik',
+          itemCount: 46, format: 'Escala de observação respondida por professores', purpose: 'TDAH no contexto escolar',
+          domains: etdahIIFactors.map((factor) => factor.label), professionalUse: 'A conferir no manual', applicationEnabled: true,
+        },
+        entryMode: 'EXTERNAL_RESULT_PER_TEACHER',
+        referenceGroups: etdahIIReferenceGroups,
+        itemEntry: { enabled: false, reason: 'Composição dos fatores, inversões e enunciados pendentes do manual.' },
+        norms: { enabled: false, reason: 'Percentil, classificação e escore Z são transcritos pelo profissional; tabelas normativas não carregadas.' },
+        regulatory: { source: 'SATEPSI / Conselho Federal de Psicologia', status: 'NAO_CONFERIDO', verifiedAt: null },
+        features: { rawScore: false, externalResult: true, review: true, export: true },
+      } as Prisma.InputJsonValue,
+      licenseMetadata: {
+        status: 'PENDING_CONFIRMATION',
+        modalities: ['EXTERNAL_RESULT_ENTRY', 'RESPONSE_STORAGE', 'REPORT_EXPORT'],
+        itemTextReproduced: false,
+        correctionStatus: 'EXTERNAL_RESULT_ONLY',
+      } as Prisma.InputJsonValue,
+    };
+    const existing = await this.prisma.instrumentVersion.findFirst({ where: { instrumentId: instrument.id, version: etdahIIInstrument.version } });
+    if (existing) {
+      await this.updateSeedVersion(existing, etdahIIInstrument.code, versionData);
+      return;
+    }
+    await this.prisma.instrumentVersion.create({ data: { instrumentId: instrument.id, version: etdahIIInstrument.version, status: 'PUBLISHED', publishedAt: new Date(), ...versionData } });
   }
 
   private async seedScaredC() {

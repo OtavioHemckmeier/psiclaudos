@@ -16,7 +16,8 @@ Marcar como concluído somente após cumprir os critérios de liberação deste 
 - [~] 06. BDI-II — página informativa, registro da pontuação dos 21 itens transcrita do caderno impresso (sem reproduzir enunciados), escore bruto 0–63, aviso do item 9 na tela e laudo factual na configuração `br-registro-escore-bruto-v1` ([ficha](docs/instruments/bdi-ii-br.md)). Pendentes: manual (faixas de gravidade, normas, domínios, itens 16/18), consulta ao SATEPSI, licença de uso digital e validação profissional.
 - [ ] 07. CDI — confirmar edição.
 - [ ] 08. MASC — confirmar edição.
-- [ ] 09. ETDAH — definir edição e formulários solicitados; abrir um item por formulário antes da implementação.
+- [~] 09a. ETDAH-II — Versão para Professores (3. ed., 2021): página informativa e registro de resultado externo por professor (pontos brutos por fator; percentil, classificação e escore Z transcritos do manual), tabela e gráfico no laudo, na configuração `3ed-2021-registro-externo-v1` ([ficha](docs/instruments/etdah-ii.md)). Pendentes: manual (itens por fator, inversões, tabelas normativas por grupo, média/DP, faixas), SATEPSI, licença e validação profissional; depois, preenchimento por itens e cálculo normativo.
+- [ ] 09b. ETDAH — demais formulários (ex.: versão para pais/autorrelato), se solicitados.
 - [ ] 10. CBCL/6–18 — confirmar edição, adaptação e regras utilizadas.
 - [ ] 11. SRS — adulto, autorrelato; confirmar edição.
 - [ ] 12. SRS — adulto, heterorrelato; confirmar edição.

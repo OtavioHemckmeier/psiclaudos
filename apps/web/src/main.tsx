@@ -36,6 +36,7 @@ import { ScaredCCard, ScaredCPage } from "./scared-c";
 import { ScaredPCard, ScaredPPage, ScaredPResults } from "./scared-p";
 import { BaiCard, BaiPage } from "./bai";
 import { BdiIICard, BdiIIPage } from "./bdi-ii";
+import { EtdahIICard, EtdahIIForm, EtdahIIPage, EtdahIIResults } from "./etdah-ii";
 import { InstrumentFieldControl, type InstrumentField } from "./instrument-field";
 
 const API = import.meta.env.VITE_API_URL ?? "/api";
@@ -387,7 +388,7 @@ const navItems: NavItem[] = [
 ];
 
 /** Instrumentos com card e página informativa próprios (arquivos .tsx dedicados). */
-const customPageInstrumentCodes = ["SNAP-IV", "SCARED-C", "SCARED-P", "BAI", "BDI-II"];
+const customPageInstrumentCodes = ["SNAP-IV", "SCARED-C", "SCARED-P", "BAI", "BDI-II", "ETDAH-II"];
 
 const statusLabel = (status?: string) =>
   ({
@@ -2077,6 +2078,7 @@ function Dashboard({
               <ScaredPCard onOpen={() => routerNavigate("/testes-da-plataforma/scared-p")} />
               <BaiCard onOpen={() => routerNavigate("/testes-da-plataforma/bai")} />
               <BdiIICard onOpen={() => routerNavigate("/testes-da-plataforma/bdi-ii")} />
+              <EtdahIICard onOpen={() => routerNavigate("/testes-da-plataforma/etdah-ii")} />
               {platformInstruments.map((instrument) => {
                 const metadata = instrument.versions[0]?.sourceMetadata?.platform;
                 if (!metadata) return null;
@@ -2122,6 +2124,9 @@ function Dashboard({
         )}
         {view === "platformTest" && platformTestCode === "BDI-II" && (
           <BdiIIPage onBack={() => navigate("platformTests")} />
+        )}
+        {view === "platformTest" && platformTestCode === "ETDAH-II" && (
+          <EtdahIIPage onBack={() => navigate("platformTests")} />
         )}
         {view === "platformTest" && selectedPlatformInstrument && selectedPlatformMetadata && (
           <section className="platform-test-page">
@@ -2620,6 +2625,14 @@ function Dashboard({
                 {application.instrumentVersion.instrument.code === "BAI" && (
                   <p className="notice">A plataforma calcula somente o escore bruto total. Domínios, normas, classificação e inclusão no laudo permanecem indisponíveis até validação técnica e profissional.</p>
                 )}
+                {application.instrumentVersion.instrument.code === "ETDAH-II" && (
+                  <EtdahIIForm
+                    key={application.id}
+                    answers={answers}
+                    onChange={setAnswers}
+                    disabled={!canEdit}
+                  />
+                )}
                 {application.instrumentVersion.instrument.code === "BDI-II" && (
                   <p className="notice">Aplique o caderno impresso e registre aqui a pontuação de cada item (0 a 3). A plataforma calcula somente o escore bruto total; classificação de gravidade, domínios e normas permanecem indisponíveis até a conferência do manual.</p>
                 )}
@@ -2627,7 +2640,8 @@ function Dashboard({
                   {application.instrumentVersion.formSchema.sections.map(
                     (section) => (
                       (application.instrumentVersion.instrument.name !== "SNAP-IV" || !application.instrumentVersion.formSchema.sections.some((item) => item.id.startsWith("snap_iv_form_")) || section.id.startsWith(`snap_iv_form_${snapIvFormTab}_`)) &&
-                      (!hasTabbedScaredP || (section.id.startsWith(`scared_p_form_${scaredPFormTab}_`) && (scaredPCurrentFormEnabled || !section.id.endsWith("_questions")))) && (
+                      (!hasTabbedScaredP || (section.id.startsWith(`scared_p_form_${scaredPFormTab}_`) && (scaredPCurrentFormEnabled || !section.id.endsWith("_questions")))) &&
+                      application.instrumentVersion.instrument.code !== "ETDAH-II" && (
                       <div
                         key={section.id}
                         className={section.id.includes("_respondent_section") ? "snapiv-respondent-section" : section.id === "parent_report_respondent" ? "scared-respondent-section" : undefined}
@@ -2672,7 +2686,8 @@ function Dashboard({
                         Salvar rascunho
                       </button>
                       <button onClick={() => void calculate()}>
-                        {["BAI", "BDI-II"].includes(application.instrumentVersion.instrument.code ?? "") ? "Calcular escore bruto" : "Calcular resultado"}
+                        {["BAI", "BDI-II"].includes(application.instrumentVersion.instrument.code ?? "") ? "Calcular escore bruto"
+                          : application.instrumentVersion.instrument.code === "ETDAH-II" ? "Registrar resultado" : "Calcular resultado"}
                       </button>
                     </>
                   )}
@@ -2730,6 +2745,14 @@ function Dashboard({
                       </div>
                       <p>Este é apenas o somatório bruto das respostas. Não há classificação, interpretação por domínios ou conclusão clínica automatizada.</p>
                     </>
+                  ) : application.instrumentVersion.instrument.code === "ETDAH-II" ? (
+                    <EtdahIIResults
+                      result={application.result}
+                      summary={summary}
+                      disabled={application.status === "LOCKED"}
+                      onSummaryChange={setSummary}
+                      onSave={() => void saveSummary()}
+                    />
                   ) : application.instrumentVersion.instrument.code === "BDI-II" ? (
                     <>
                       {Number(application.result.bdi_ii_item_9_score ?? 0) >= 1 && (

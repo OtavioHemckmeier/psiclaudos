@@ -1,5 +1,6 @@
 import { classifySnapIvScore, snapIvInstrument } from "../catalog/instrument-config";
 import { scaredCDomains } from "../catalog/scared-c-config";
+import { etdahIIFactors, etdahIIForms, etdahIIReferenceGroups } from "../catalog/etdah-ii-config";
 
 export type PresentationField = { id: string; label?: string };
 export type PresentationSchema = {
@@ -49,6 +50,16 @@ const reportContent: Record<string, InstrumentReportContent> = {
     interpretation: "A classificação de gravidade e a interpretação clínica automática não estão disponíveis nesta versão da plataforma. A análise do escore deve seguir o manual e as normas da adaptação brasileira e ser integrada à entrevista e às demais fontes da avaliação.",
     references: ["Werlang, B. S. G.; Gorenstein, C.; Argimon, I. I. L. & Wang, Y. P. (2010). Inventário de Depressão de Beck (BDI-II). São Paulo: Casapsi Livraria e Editora."],
   },
+  "ETDAH-II": {
+    purpose: "caracterizar, a partir da observação de professores, o perfil de dificuldades de atenção, hiperatividade/impulsividade, aprendizagem e comportamento social no contexto escolar.",
+    theoreticalContext: "O ETDAH-II é uma escala de observação respondida por professores, com 46 itens distribuídos em quatro fatores: Atenção (15 itens), Hiperatividade/Impulsividade (12), Aprendizagem (13) e Comportamento Social (6). Cada professor respondente é registrado separadamente.",
+    interpretation: "Os pontos brutos foram apurados no protocolo e o percentil, a classificação e o escore Z foram transcritos pelo profissional a partir da tabela normativa do manual para o grupo de referência indicado. O perfil descreve a percepção de cada professor no ambiente escolar e deve ser integrado à entrevista, à história do desenvolvimento, ao relato familiar e à observação do aluno; diferenças entre professores devem ser analisadas à luz das disciplinas, das exigências das tarefas e do tempo de convivência.",
+    references: [
+      "Benczik, E. B. P. ETDAH-II: Escala do Transtorno de Déficit de Atenção/Hiperatividade em Contexto Escolar: Versão para professores. 3. ed. São Paulo: Pearson Clinical Brasil, 2021.",
+      "Hogrefe. ETDAH-II — apresentação do instrumento, autoria, público-alvo e aplicação. https://hogrefe.com.br/escala-do-transtorno-de-deficit-de-atenc-o-hiperatividade-em-contexto-escol.html",
+      "Centers for Disease Control and Prevention (CDC). Diagnosing ADHD. https://www.cdc.gov/adhd/diagnosis/index.html",
+    ],
+  },
   "SNAP-IV": {
     purpose: "avaliar relatos de desatenção, hiperatividade/impulsividade e oposição/desafio em crianças e adolescentes.",
     theoreticalContext: "A SNAP-IV de 26 itens reúne relatos sobre desatenção (itens 1–9), hiperatividade/impulsividade (10–18) e oposição/desafio (19–26). Cada item recebe de 0 a 3 pontos; as pontuações são somadas por domínio.",
@@ -90,6 +101,16 @@ export const instrumentReportPresentation = (code: string, result: Record<string
   return source && typeof source === "object" && !Array.isArray(source) ? source as PresentationSchema : {};
 };
 
+export const etdahIIReportTableNote = "Pontos brutos apurados no protocolo. Percentil, classificação e escore Z transcritos pelo profissional da tabela normativa do manual para o grupo de referência indicado; a plataforma não calcula normas nesta versão. “—” indica valor não informado.";
+
+/** Nota exibida logo abaixo das tabelas do instrumento, no PDF e no Google Docs. */
+export const instrumentReportTableNote = (code: string, tables: InstrumentReportTable[]) => {
+  if (!tables.some((table) => table.kind === "matrix")) return undefined;
+  if (code === "SCARED-C" || code === "SCARED-P") return scaredReportTableNote;
+  if (code === "ETDAH-II") return etdahIIReportTableNote;
+  return undefined;
+};
+
 export const scaredReportTableNote = "Pontuação: soma dos itens da dimensão (0 a 2 por item; total de 0 a 82). Ponto de corte: referência de rastreamento da ficha original. Atingir o corte sugere investigação clínica; ficar abaixo dele não exclui sintomas ou transtorno.";
 
 export function instrumentReportTables(code: string, result: Record<string, unknown>, presentation: PresentationSchema): InstrumentReportTable[] {
@@ -99,6 +120,27 @@ export function instrumentReportTables(code: string, result: Record<string, unkn
   if (code === "BDI-II" && "bdi_ii_total_raw" in result) {
     // O item 9 fica fora do documento exportado; o aviso aparece somente na tela.
     return [{ kind: "matrix", title: "BDI-II — resultado", headers: ["Pontuação total", "Classificação"], rows: [[`${String(result.bdi_ii_total_raw)} / 63`, "Não disponível"]] }];
+  }
+  if (code === "ETDAH-II") {
+    const formatted = (value: unknown) => {
+      if (value === undefined || value === null || value === "") return "—";
+      return typeof value === "number" ? value.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : String(value);
+    };
+    const tables = etdahIIForms.flatMap(({ formNumber, prefix }): InstrumentReportTable[] => {
+      if (!etdahIIFactors.some((factor) => `${prefix}_${factor.id}_raw` in result)) return [];
+      const hasZ = etdahIIFactors.some((factor) => `${prefix}_${factor.id}_z` in result);
+      const group = etdahIIReferenceGroups.find((option) => option.value === result[`${prefix}_reference_group`])?.label ?? "Não informada";
+      return [{
+        kind: "matrix",
+        title: `ETDAH-II — Professor ${formNumber}: ${String(result[`${prefix}_respondent`] ?? "Não identificado")} (referência: ${group})`,
+        headers: ["Fator", "Pontos brutos", "Percentil", "Classificação", ...(hasZ ? ["Escore Z"] : [])],
+        rows: etdahIIFactors.map((factor) => {
+          const field = `${prefix}_${factor.id}`;
+          return [factor.label, formatted(result[`${field}_raw`]), formatted(result[`${field}_percentile`]), formatted(result[`${field}_classification`]), ...(hasZ ? [formatted(result[`${field}_z`])] : [])];
+        }),
+      }];
+    });
+    if (tables.length) return tables;
   }
   if (code === "SNAP-IV") {
     const formNumbers = [...new Set(Object.keys(result)
