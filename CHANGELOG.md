@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.3](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.2...v0.1.3) (2026-10-17)
+
+
+### Bug Fixes
+
+* **web:** simplifica cadastro de laudo e seleção de testes ([5f8713f](https://github.com/OtavioHemckmeier/psiclaudos/commit/5f8713f22fe39f29f463b38591cf1c9f46208d93))
+
 ### [0.1.2](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.1...v0.1.2) (2026-10-13)
 
 ### 0.1.1 (2026-10-06)
