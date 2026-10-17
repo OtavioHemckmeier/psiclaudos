@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.4](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.3...v0.1.4) (2026-10-17)
+
+
+### Bug Fixes
+
+* **api:** inicializa catálogo independente dos dados de demonstração ([4fd4278](https://github.com/OtavioHemckmeier/psiclaudos/commit/4fd42785ac93318f199ad1222bed52fa5a073883))
+
 ### [0.1.3](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.2...v0.1.3) (2026-10-17)
 
 
