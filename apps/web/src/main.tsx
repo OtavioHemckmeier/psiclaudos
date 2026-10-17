@@ -754,8 +754,6 @@ function Dashboard({
   const [title, setTitle] = useState("");
   const [reportFormOpen, setReportFormOpen] = useState(false);
   const [patientId, setPatientId] = useState("");
-  const [quickPatientName, setQuickPatientName] = useState("");
-  const [quickPatientBirthDate, setQuickPatientBirthDate] = useState("");
   const [applicationDate, setApplicationDate] = useState("");
   const [selectedInstrumentVersionIds, setSelectedInstrumentVersionIds] =
     useState<string[]>([]);
@@ -891,8 +889,6 @@ function Dashboard({
       setEvaluations(evaluationData);
       setInstruments(instrumentData);
       setProfile(profileData);
-      if (!patientId && patientData.items[0])
-        setPatientId(patientData.items[0].id);
     } catch (err) {
       setMessage(
         err instanceof Error ? err.message : "Falha ao carregar dados.",
@@ -1029,29 +1025,17 @@ function Dashboard({
         setMessage("Informe a data de aplicação do teste.");
         return;
       }
-      let selectedPatientId = patientId;
-      let selectedPatientName = patients.find(
-        (patient) => patient.id === patientId,
-      )?.name;
-      if (!selectedPatientId) {
-        if (!quickPatientName.trim() || !quickPatientBirthDate) {
-          setMessage("Selecione um paciente ou informe nome e data de nascimento.");
-          return;
-        }
-        const patient = await request<Patient>("/patients", {
-          method: "POST",
-          body: JSON.stringify({
-            name: quickPatientName.trim(),
-            birthDate: quickPatientBirthDate,
-          }),
-        });
-        selectedPatientId = patient.id;
-        selectedPatientName = patient.name;
+      if (!patientId) {
+        setMessage("Selecione um paciente cadastrado.");
+        return;
       }
+      const selectedPatientName = patients.find(
+        (patient) => patient.id === patientId,
+      )?.name ?? (details?.id === patientId ? details.name : undefined);
       const evaluation = await request<Evaluation>("/evaluations", {
         method: "POST",
         body: JSON.stringify({
-          patientId: selectedPatientId,
+          patientId,
           title: title.trim() || `Avaliação de ${selectedPatientName ?? "paciente"}`,
           applicationDate: applicationDate || undefined,
         }),
@@ -1066,8 +1050,6 @@ function Dashboard({
       );
       setTitle("");
       setPatientId("");
-      setQuickPatientName("");
-      setQuickPatientBirthDate("");
       setApplicationDate("");
       setSelectedInstrumentVersionIds([]);
       setReportFormOpen(false);
@@ -1156,8 +1138,6 @@ function Dashboard({
   const createReportForPatient = (patient: Patient) => {
     setPatientId(patient.id);
     setTitle("");
-    setQuickPatientName("");
-    setQuickPatientBirthDate("");
     setApplicationDate("");
     setSelectedInstrumentVersionIds([]);
     setReportFormOpen(true);
@@ -1165,8 +1145,6 @@ function Dashboard({
   const openReportForm = () => {
     setPatientId("");
     setTitle("");
-    setQuickPatientName("");
-    setQuickPatientBirthDate("");
     setApplicationDate("");
     setSelectedInstrumentVersionIds([]);
     setReportFormOpen(true);
@@ -3296,16 +3274,11 @@ function Dashboard({
               </button>
               <h2>Novo Laudo</h2>
               <label>
-                Selecione um Paciente já Cadastrado
+                Paciente cadastrado
                 <select
                   value={patientId}
-                  onChange={(event) => {
-                    setPatientId(event.target.value);
-                    if (event.target.value) {
-                      setQuickPatientName("");
-                      setQuickPatientBirthDate("");
-                    }
-                  }}
+                  onChange={(event) => setPatientId(event.target.value)}
+                  required
                 >
                   <option value="">Selecione um paciente</option>
                   {details && !patients.some((patient) => patient.id === details.id) && (
@@ -3318,32 +3291,7 @@ function Dashboard({
                   ))}
                 </select>
               </label>
-              <div className="report-create-divider"><span>ou</span></div>
-              <div className="form-grid report-create-fields">
-              <label className="form-grid-wide">
-                <span><b>*</b> Nome do paciente</span>
-                <input
-                  value={quickPatientName}
-                  onChange={(event) => {
-                    setQuickPatientName(event.target.value);
-                    if (event.target.value) setPatientId("");
-                  }}
-                  placeholder="Insira um nome para o paciente"
-                  disabled={Boolean(patientId)}
-                />
-              </label>
-              <label>
-                <span><b>*</b> Data de nascimento</span>
-                <input
-                  type="date"
-                  value={quickPatientBirthDate}
-                  onChange={(event) => {
-                    setQuickPatientBirthDate(event.target.value);
-                    if (event.target.value) setPatientId("");
-                  }}
-                  disabled={Boolean(patientId)}
-                />
-              </label>
+              <small className="field-help">Cadastre novos pacientes na seção Pacientes antes de criar o laudo.</small>
               <label>
                 <span><b>*</b> Data de aplicação do teste</span>
                 <input
@@ -3353,35 +3301,34 @@ function Dashboard({
                   required
                 />
               </label>
-              </div>
-              <label>
-                Testes incluídos no laudo
-                <select
-                  multiple
-                  size={Math.min(Math.max(availableInstrumentVersions.length, 1), 4)}
-                  value={selectedInstrumentVersionIds}
-                  onChange={(event) =>
-                    setSelectedInstrumentVersionIds(
-                      Array.from(event.target.selectedOptions, (option) => option.value),
-                    )
-                  }
-                >
+              <fieldset className="report-test-picker">
+                <legend>Testes incluídos no laudo</legend>
+                <div className="report-test-options">
                   {availableInstrumentVersions.length === 0 ? (
-                    <option disabled>Nenhum teste disponível</option>
+                    <p className="muted">Nenhum teste disponível.</p>
                   ) : (
                     availableInstrumentVersions.map((instrument) => (
-                      <option
-                        key={instrument.id}
-                        value={instrument.id}
-                        disabled={!instrument.enabled}
-                      >
-                        {instrument.label}{instrument.enabled ? "" : " — em configuração"}
-                      </option>
+                      <label className="boolean-field" key={instrument.id}>
+                        <input
+                          type="checkbox"
+                          checked={selectedInstrumentVersionIds.includes(instrument.id)}
+                          disabled={!instrument.enabled}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setSelectedInstrumentVersionIds((selected) =>
+                              checked
+                                ? [...selected, instrument.id]
+                                : selected.filter((id) => id !== instrument.id),
+                            );
+                          }}
+                        />
+                        <span>{instrument.label}{instrument.enabled ? "" : " — indisponível (em configuração)"}</span>
+                      </label>
                     ))
                   )}
-                </select>
-                <small className="field-help">Use Ctrl ou Cmd para selecionar mais de um teste.</small>
-              </label>
+                </div>
+                <small className="field-help" aria-live="polite">{selectedInstrumentVersionIds.length} teste(s) selecionado(s). Marque os testes que deseja incluir.</small>
+              </fieldset>
               <div className="report-create-actions">
                 <button className="secondary" type="button" onClick={() => setReportFormOpen(false)}>Cancelar</button>
                 <button type="submit">OK</button>
