@@ -119,6 +119,8 @@ A aprovação de um instrumento não conclui a preparação operacional. Seguran
 
 ## Atualização
 
+- 2026-10-17: corrigida a inicialização compartilhada do catálogo, antes dependente de `SEED_DEMO_INSTRUMENT=true`. A API passa a carregar as configurações existentes por padrão, com opção explícita `SEED_CATALOG=false`. Os quatro cenários de inicialização estão cobertos em `apps/api/src/catalog/catalog.module.spec.ts`; `npm test` e a checagem de tipos da API passaram. Não foram alterados itens, cálculos, versões ou modalidades clínicas. A conferência em produção após o deploy continua pendente.
+
 - Usar `[ ]` para não iniciado, `[~]` para implementação parcial sem liberação clínica e `[x]` apenas para concluído com evidência.
 - Registrar bloqueios indicando o material ou a decisão que falta.
 - Ao concluir um instrumento, atualizar a fila e o registro de conclusão antes de iniciar o próximo.

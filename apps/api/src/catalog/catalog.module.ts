@@ -7,5 +7,8 @@ import { CatalogService } from './catalog.service';
 @Module({ imports: [AuthModule], controllers: [CatalogController], providers: [CatalogService, PrismaService], exports: [CatalogService] })
 export class CatalogModule implements OnModuleInit {
   constructor(private readonly catalog: CatalogService) {}
-  async onModuleInit() { if (process.env.SEED_DEMO_INSTRUMENT === 'true') await this.catalog.seedDemo(); }
+  async onModuleInit() {
+    if (process.env.SEED_CATALOG !== 'false') await this.catalog.seedCatalog();
+    if (process.env.SEED_DEMO_INSTRUMENT === 'true') await this.catalog.seedDemo();
+  }
 }

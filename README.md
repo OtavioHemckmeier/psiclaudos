@@ -147,5 +147,7 @@ docker pull ghcr.io/otaviohemckmeier/psiclaudos-web:vX.Y.Z
 
 Requisitos de execução das imagens:
 
+O catálogo de instrumentos é inicializado automaticamente ao iniciar a API, independentemente dos dados de demonstração. `SEED_CATALOG=false` desativa explicitamente essa inicialização; `SEED_DEMO_INSTRUMENT=true` inclui apenas o instrumento técnico de demonstração. Versões já utilizadas em aplicações continuam preservadas. A presença no catálogo não representa homologação clínica; consulte `CHECKLIST_INSTRUMENTOS.md` para as pendências de cada modalidade.
+
 - **API** (porta 3000): `DATABASE_URL` (MongoDB com replica set), `NODE_ENV=production`, `JWT_SECRET` e `JWT_REFRESH_SECRET` fortes, `WEB_ORIGIN` e, se usar Google Docs, as variáveis `GOOGLE_OAUTH_*`. Ao iniciar, ela aplica `prisma db push` e o backfill. Monte um volume persistente em `/app/storage` (PDFs dos laudos).
 - **Web** (porta 80): nginx com o front e proxy de `/api/` para a API. O endereço interno da API vem de `API_UPSTREAM` (padrão `http://api:3000`); o nome precisa resolver na rede do container quando o nginx sobe.

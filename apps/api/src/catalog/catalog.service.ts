@@ -37,7 +37,7 @@ export class CatalogService {
     return instrument;
   }
 
-  async seedDemo() {
+  async seedCatalog() {
     await this.seedAsrs18();
     await this.seedSnapIv();
     await this.seedScaredC();
@@ -45,6 +45,9 @@ export class CatalogService {
     await this.seedBai();
     await this.seedBdiII();
     await this.seedEtdahII();
+  }
+
+  async seedDemo() {
     const existing = await this.prisma.instrumentDefinition.findUnique({ where: { code: demoInstrument.code } });
     if (existing) { await this.prisma.instrumentVersion.updateMany({ where: { instrumentId: existing.id, version: demoInstrument.version }, data: { presentationSchema: demoInstrument.presentationSchema as unknown as Prisma.InputJsonValue } }); return existing; }
     const contentHash = createHash('sha256').update(JSON.stringify(demoInstrument)).digest('hex');
