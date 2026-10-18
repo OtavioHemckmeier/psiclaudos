@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -74,6 +75,14 @@ export class EvaluationsController {
     @Param("applicationId") id: string,
   ) {
     return this.evaluations.getApplication(user, id);
+  }
+
+  @Delete("/applications/:applicationId")
+  removeApplication(
+    @CurrentUser() user: AuthUser,
+    @Param("applicationId") id: string,
+  ) {
+    return this.evaluations.removeApplication(user, id);
   }
 
   @Patch("/applications/:applicationId/answers")

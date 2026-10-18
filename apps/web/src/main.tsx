@@ -780,6 +780,7 @@ function Dashboard({
   });
   const [application, setApplication] = useState<Application | null>(null);
   const [activeEditorApplicationId, setActiveEditorApplicationId] = useState<string | null>(null);
+  const [removingApplicationId, setRemovingApplicationId] = useState<string | null>(null);
   const [applicationTab, setApplicationTab] = useState<
     "test" | "results" | "details"
   >("test");
@@ -1290,6 +1291,33 @@ function Dashboard({
     setInstrumentVersionId("");
     setInstrumentPickerOpen(true);
   };
+  async function removeApplication(item: NonNullable<Evaluation["applications"]>[number]) {
+    if (!selectedEvaluation || removingApplicationId) return;
+    const name = item.instrumentVersion?.instrument.name ?? "este teste";
+    if (!window.confirm(`Remover ${name} deste laudo? As respostas e os resultados deste teste serão excluídos. Documentos já gerados serão preservados. Esta ação não pode ser desfeita.`)) return;
+    setRemovingApplicationId(item.id);
+    try {
+      await request(`/evaluations/applications/${item.id}`, { method: "DELETE" });
+      setSelectedEvaluation((current) => current ? {
+        ...current,
+        applications: current.applications?.filter((entry) => entry.id !== item.id),
+      } : current);
+      if (application?.id === item.id) {
+        setApplication(null);
+        setAnswers({});
+        setSummary("");
+      }
+      if (activeEditorApplicationId === item.id) selectReportChapter("identification");
+      const updated = await request<Evaluation>(`/evaluations/${selectedEvaluation.id}`);
+      setSelectedEvaluation(updated);
+      setEvaluations((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
+      setMessage("Teste removido do laudo. Documentos já gerados foram preservados.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Não foi possível remover o teste.");
+    } finally {
+      setRemovingApplicationId(null);
+    }
+  }
   async function openApplication(applicationId: string) {
     try {
       const loaded = await request<Application>(
@@ -2238,9 +2266,10 @@ function Dashboard({
               <div className="report-outline-tests">
                 <span className="section-kicker">Testes</span>
                 {selectedEvaluation.applications?.map((item) => (
+                  <div className="outline-application-entry" key={item.id}>
                   <button
                     className={`outline-application ${activeEditorApplicationId === item.id ? "active" : ""}`}
-                    key={item.id}
+                    disabled={removingApplicationId !== null}
                     onClick={() => void openApplication(item.id)}
                   >
                     <span>
@@ -2251,6 +2280,15 @@ function Dashboard({
                       Versão {item.instrumentVersion?.version ?? "-"}
                     </small>
                   </button>
+                  <button
+                    className="danger"
+                    disabled={removingApplicationId !== null}
+                    aria-label={`Remover ${item.instrumentVersion?.instrument.name ?? "teste"} do laudo`}
+                    onClick={() => void removeApplication(item)}
+                  >
+                    {removingApplicationId === item.id ? "Removendo…" : "Remover teste"}
+                  </button>
+                  </div>
                 ))}
                 <button
                   onClick={() => openInstrumentPicker(selectedEvaluation)}

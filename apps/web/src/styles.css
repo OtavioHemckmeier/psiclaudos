@@ -1900,6 +1900,11 @@ li span {
   padding: 0.6rem 0.7rem;
   font-size: 0.72rem;
 }
+.outline-application-entry {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
 .report-outline-tests .outline-application {
   display: grid;
   gap: 0.2rem;

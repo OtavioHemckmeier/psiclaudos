@@ -298,8 +298,35 @@ export class EvaluationsService {
     return updated;
   }
 
-  async syncStatus(evaluationId: string) {
-    const evaluation = await this.prisma.evaluation.findUnique({
+  async removeApplication(user: AuthUser, id: string) {
+    return this.prisma.$transaction(async (transaction) => {
+      const application = await transaction.instrumentApplication.findFirst({
+        where: { id, organizationId: user.organizationId },
+      });
+      if (!application) throw new NotFoundException("Aplicação não encontrada.");
+      await transaction.instrumentApplication.delete({
+        where: { id: application.id, organizationId: user.organizationId },
+      });
+      await this.syncStatus(application.evaluationId, transaction);
+      await transaction.auditEvent.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: user.id,
+          event: "INSTRUMENT_REMOVED",
+          entityType: "InstrumentApplication",
+          entityId: application.id,
+          metadata: {
+            evaluationId: application.evaluationId,
+            instrumentVersionId: application.instrumentVersionId,
+          },
+        },
+      });
+      return { id: application.id };
+    });
+  }
+
+  async syncStatus(evaluationId: string, client: Prisma.TransactionClient = this.prisma) {
+    const evaluation = await client.evaluation.findUnique({
       where: { id: evaluationId },
       select: { applications: { select: { status: true } } },
     });
@@ -319,6 +346,6 @@ export class EvaluationsService {
               : statuses.some((current) => current === "REVIEWED")
                 ? "REVIEWED"
                 : "DRAFT";
-    await this.prisma.evaluation.update({ where: { id: evaluationId }, data: { status } });
+    await client.evaluation.update({ where: { id: evaluationId }, data: { status } });
   }
 }
