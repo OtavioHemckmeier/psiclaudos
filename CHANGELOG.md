@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.6](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.5...v0.1.6) (2026-10-18)
+
+
+### Features
+
+* permite remover testes de um laudo ([993c0c2](https://github.com/OtavioHemckmeier/psiclaudos/commit/993c0c25635367e6a591a6afb8a82a178dc6554e))
+
 ### [0.1.5](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.4...v0.1.5) (2026-10-18)
 
 
