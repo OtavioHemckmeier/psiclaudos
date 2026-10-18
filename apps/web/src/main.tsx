@@ -10,6 +10,7 @@ import "./styles.css";
 import "./ios.css";
 import "./clean.css";
 import { APP_NAME, APP_TAGLINE, BrandMark } from "./brand";
+import { SidebarTooltip } from "./sidebar-tooltip";
 import {
   CheckSealIcon,
   ChecklistIcon,
@@ -1612,15 +1613,16 @@ function Dashboard({
             <strong>{APP_NAME}</strong>
             <small>{APP_TAGLINE}</small>
           </div>
-          <button
-            type="button"
-            className="sidebar-toggle"
-            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-            aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"}
-            title={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"}
-          >
-            <SidebarIcon size={18} />
-          </button>
+          <SidebarTooltip label={sidebarCollapsed ? "Expandir menu lateral" : "Encolher menu lateral"} enabled={sidebarCollapsed}>
+            <button
+              type="button"
+              className="sidebar-toggle"
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+              aria-expanded={!sidebarCollapsed}
+            >
+              <SidebarIcon size={18} />
+            </button>
+          </SidebarTooltip>
           <button
             type="button"
             className="sidebar-close"
@@ -1637,29 +1639,31 @@ function Dashboard({
         </div>
         <nav className="sidebar-nav" aria-label="Navegação principal">
           {navItems.map(({ to, label, Icon, end, activeView }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              title={sidebarCollapsed ? label : undefined}
-              className={activeView && view === activeView ? "active" : undefined}
-              onClick={() => setMobileMenu(false)}
-            >
-              <span className="sidebar-nav-icon" aria-hidden="true">
-                <Icon size={18} />
-              </span>
-              <span>{label}</span>
-            </NavLink>
+            <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
+              <NavLink
+                to={to}
+                end={end}
+                className={activeView && view === activeView ? "active" : undefined}
+                onClick={() => setMobileMenu(false)}
+              >
+                <span className="sidebar-nav-icon" aria-hidden="true">
+                  <Icon size={18} />
+                </span>
+                <span>{label}</span>
+              </NavLink>
+            </SidebarTooltip>
           ))}
         </nav>
         <div className="sidebar-footer">
           <span>Ambiente local</span>
-          <button className="sidebar-logout" onClick={logout}>
-            <span className="sidebar-nav-icon" aria-hidden="true">
-              <LogoutIcon size={18} />
-            </span>
-            <span>Sair</span>
-          </button>
+          <SidebarTooltip label="Sair" enabled={sidebarCollapsed}>
+            <button className="sidebar-logout" onClick={logout}>
+              <span className="sidebar-nav-icon" aria-hidden="true">
+                <LogoutIcon size={18} />
+              </span>
+              <span>Sair</span>
+            </button>
+          </SidebarTooltip>
         </div>
       </aside>
       {mobileMenu && (

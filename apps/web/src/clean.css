@@ -134,6 +134,44 @@ body {
 .sidebar-toggle {
   color: var(--ios-label-2);
 }
+.sidebar-tooltip {
+  position: fixed;
+  z-index: 1000;
+  transform: translateY(-50%);
+  max-width: min(240px, calc(100vw - 100px));
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--ios-border);
+  border-radius: 8px;
+  background: var(--ios-glass-strong);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  color: var(--ios-label);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: none;
+  animation: sidebar-tooltip-appear 120ms ease-out;
+}
+@keyframes sidebar-tooltip-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-tooltip { animation: none; }
+}
+@media (min-width: 901px) {
+  .sidebar-is-collapsed .sidebar-brand {
+    flex-direction: column;
+    gap: 0.65rem;
+    padding-inline: 0;
+  }
+  .sidebar-is-collapsed .sidebar-brand .brand-mark {
+    display: block;
+    width: 34px;
+    height: 34px;
+  }
+}
 .sidebar-context {
   border: 1px solid var(--ios-border);
   border-radius: 12px;
