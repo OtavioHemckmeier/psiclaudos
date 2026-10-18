@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.5](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.4...v0.1.5) (2026-10-18)
+
+
+### Bug Fixes
+
+* **web:** ajusta logo e tooltips do menu recolhido ([5d0c80f](https://github.com/OtavioHemckmeier/psiclaudos/commit/5d0c80f4e9a0c1346e5451bb61fcf72562f08518))
+
 ### [0.1.4](https://github.com/OtavioHemckmeier/psiclaudos/compare/v0.1.3...v0.1.4) (2026-10-17)
 
 
